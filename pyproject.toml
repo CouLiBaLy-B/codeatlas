@@ -1,0 +1,87 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "codeatlas"
+version = "0.1.0"
+description = "Générateur de documentation intelligente par analyse statique : diagrammes UML, graphes d'appels, métriques et site MkDocs, sans LLM ni réseau."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Bourahima Coulibaly" }]
+keywords = ["documentation", "static-analysis", "uml", "mermaid", "mkdocs"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Documentation",
+    "Topic :: Software Development :: Documentation",
+]
+dependencies = [
+    "click>=8.1",
+    "rich>=13.0",
+    "jinja2>=3.1",
+    "networkx>=3.2",
+]
+
+[project.optional-dependencies]
+site = ["mkdocs>=1.6", "mkdocs-material>=9.5"]
+javascript = [
+    "tree-sitter>=0.23",
+    "tree-sitter-javascript>=0.23",
+    "tree-sitter-typescript>=0.23",
+]
+java = ["tree-sitter>=0.23", "tree-sitter-java>=0.23"]
+svg = ["cairosvg>=2.7"]
+all = ["codeatlas[site,javascript,java,svg]"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[project.scripts]
+codeatlas = "codeatlas.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/CouLiBaLy-B/codeatlas"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/codeatlas"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/codeatlas/site/assets" = "codeatlas/site/assets"
+"src/codeatlas/site/templates" = "codeatlas/site/templates"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+extend-exclude = ["examples"]  # corpus de test — contient un fichier invalide volontaire
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["SIM108"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+mypy_path = "src"
+packages = ["codeatlas"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: benchmarks et tests longs"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["src/codeatlas"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

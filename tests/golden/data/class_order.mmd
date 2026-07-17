@@ -1,0 +1,17 @@
+classDiagram
+    class Order {
+        +customer
+        +draft_line
+        +lines: list~OrderLine~
+        +__init__(customer) None
+        +add(product, quantity) None
+        +total() float
+    }
+    class OrderLine {
+        +product: Product
+        +quantity: int
+        +__init__(product, quantity) None
+        +subtotal() float
+    }
+    Order *-- OrderLine
+    OrderLine o-- Product

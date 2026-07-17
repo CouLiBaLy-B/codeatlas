@@ -1,0 +1,13 @@
+classDiagram
+    class DigitalProduct {
+        +download_url: str
+        +__init__(name, price, download_url) None
+        +price_with_tax(rate) float
+    }
+    class Product {
+        +name: str
+        +price: float
+        +__init__(name, price) None
+        +price_with_tax(rate) float
+    }
+    Product <|-- DigitalProduct

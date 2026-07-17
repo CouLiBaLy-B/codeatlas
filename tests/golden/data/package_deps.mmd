@@ -1,0 +1,15 @@
+graph LR
+    p0["shopdemo"]
+    p1["shopdemo.legacy"]
+    p2["shopdemo.models"]
+    p3["shopdemo.services"]
+    p4["shopdemo.storage"]
+    p0 --> p3
+    p1 --> p3
+    p3 --> p1
+    p3 --> p2
+    p3 --> p4
+    p4 --> p2
+    classDef cycle stroke:#d33,stroke-width:2px
+    class p1,p3 cycle
+    linkStyle 1,2 stroke:#d33,stroke-width:2px
