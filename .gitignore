@@ -13,7 +13,7 @@ build/
 htmlcov/
 
 # Sorties de génération locales
-codeatlas-docs/
+codeatlas-docs*/
 site/
 
 # Éditeurs / OS

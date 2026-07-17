@@ -22,7 +22,13 @@ class EntryPoint:
 
 def detect_entrypoints(graph: CodeGraph) -> list[EntryPoint]:
     """Tous les points d'entrée du graphe, triés (kind, node_id) — déterministe."""
+    from codeatlas.insights.entrypoints.java import recognize as recognize_java
+    from codeatlas.insights.entrypoints.javascript import recognize as recognize_javascript
     from codeatlas.insights.entrypoints.python import recognize as recognize_python
 
-    found = list(recognize_python(graph))
-    return sorted(found, key=lambda e: (e.kind, e.node_id, e.framework))
+    found = [
+        *recognize_python(graph),
+        *recognize_javascript(graph),
+        *recognize_java(graph),
+    ]
+    return sorted(found, key=lambda e: (e.kind, e.node_id, e.framework, e.label))

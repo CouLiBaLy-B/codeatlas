@@ -1,0 +1,1 @@
+"""Couche infrastructure (persistance, intégrations)."""

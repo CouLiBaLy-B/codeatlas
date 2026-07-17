@@ -70,11 +70,33 @@ def available_analyzers() -> dict[str, LanguageAnalyzer]:
     return dict(sorted(_REGISTRY.items()))
 
 
+def _has_module(name: str) -> bool:
+    from importlib.util import find_spec
+
+    try:
+        return find_spec(name) is not None
+    except (ImportError, ValueError):  # pragma: no cover
+        return False
+
+
 def _ensure_builtin_registered() -> None:
     if "python" not in _REGISTRY:
         from codeatlas.analyzers.python.analyzer import PythonAnalyzer
 
         register(PythonAnalyzer())
+    if (
+        "javascript" not in _REGISTRY
+        and _has_module("tree_sitter")
+        and _has_module("tree_sitter_javascript")
+        and _has_module("tree_sitter_typescript")
+    ):
+        from codeatlas.analyzers.javascript.analyzer import JavaScriptAnalyzer
+
+        register(JavaScriptAnalyzer())
+    if "java" not in _REGISTRY and _has_module("tree_sitter") and _has_module("tree_sitter_java"):
+        from codeatlas.analyzers.java.analyzer import JavaAnalyzer
+
+        register(JavaAnalyzer())
 
 
 # -- découverte des fichiers -------------------------------------------------

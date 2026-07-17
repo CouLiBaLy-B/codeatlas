@@ -1,0 +1,9 @@
+{
+  "name": "front",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "shared-lib": "workspace:*",
+    "react": "^18.0.0"
+  }
+}

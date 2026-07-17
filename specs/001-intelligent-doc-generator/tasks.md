@@ -173,16 +173,16 @@ par des indices.
 
 ### Tests for User Story 5 (test-first ⚠️)
 
-- [ ] T057 [P] [US5] Corpus examples/python-demo/layered/ : couches api/domain/infra nommées, violation volontaire (infra → api), patterns implémentés + contre-exemples proches (faux positifs à éviter — SC-008)
-- [ ] T058 [P] [US5] Tests détection couches/composants/violations (avec evidence obligatoire) dans tests/unit/test_architecture.py
-- [ ] T059 [P] [US5] Tests détection patterns (vrais positifs + non-détection des contre-exemples) dans tests/unit/test_patterns.py
-- [ ] T060 [P] [US5] Test d'intégration des 3 scénarios d'acceptation US5 dans tests/integration/test_architecture_view.py
+- [x] T057 [P] [US5] Corpus examples/layered-demo/ (corpus séparé pour préserver les goldens de python-demo) : couches api/domain/infra nommées, violation volontaire (infra → api), patterns implémentés + contre-exemples proches (faux positifs à éviter — SC-008)
+- [x] T058 [P] [US5] Tests détection couches/composants/violations (avec evidence obligatoire) dans tests/unit/test_architecture.py
+- [x] T059 [P] [US5] Tests détection patterns (vrais positifs + non-détection des contre-exemples) dans tests/unit/test_patterns.py
+- [x] T060 [P] [US5] Test d'intégration des 3 scénarios d'acceptation US5 dans tests/integration/test_architecture_view.py
 
 ### Implementation for User Story 5
 
-- [ ] T061 [US5] Insight architecture (couches par nommage × direction des dépendances, composants par communautés, violations — R7) dans src/codeatlas/insights/architecture.py
-- [ ] T062 [US5] Insight patterns (5 patterns v1 par signatures structurelles sur l'IR, indices) dans src/codeatlas/insights/patterns.py
-- [ ] T063 [US5] Vue « Architecture » : renderer Mermaid (couches + violations en rouge) et templates (page architecture, mention patterns sur pages classes) dans src/codeatlas/renderers/mermaid/architecture.py et src/codeatlas/site/templates/architecture.md.j2
+- [x] T061 [US5] Insight architecture (couches par nommage × direction des dépendances, composants par communautés, violations — R7) dans src/codeatlas/insights/architecture.py
+- [x] T062 [US5] Insight patterns (5 patterns v1 par signatures structurelles sur l'IR, indices) dans src/codeatlas/insights/patterns.py
+- [x] T063 [US5] Vue « Architecture » : renderer Mermaid (couches + violations en rouge) et templates (page architecture, mention patterns sur pages classes) dans src/codeatlas/renderers/mermaid/architecture.py et src/codeatlas/site/templates/architecture.md.j2
 
 **Checkpoint**: US1–US5 fonctionnelles indépendamment
 
@@ -197,21 +197,21 @@ manifestes, site unique avec navigation croisée et graphe inter-services.
 
 ### Tests for User Story 6 (test-first ⚠️)
 
-- [ ] T064 [P] [US6] Corpus examples/ts-demo/ : classes/interfaces TS, imports, routes Express factices, JSDoc, fichier invalide volontaire
-- [ ] T065 [P] [US6] Corpus examples/java-demo/ : classes/interfaces, héritage, contrôleur Spring factice, Javadoc, main
-- [ ] T066 [P] [US6] Corpus examples/monorepo-demo/ : front TS + back Python + service Java + sous-dossier langage inconnu, dépendances croisées déclarées dans les manifestes
-- [ ] T067 [P] [US6] Tests contrat analyseur JS/TS (mêmes exigences que T017) dans tests/unit/test_js_analyzer.py
-- [ ] T068 [P] [US6] Tests contrat analyseur Java dans tests/unit/test_java_analyzer.py
-- [ ] T069 [P] [US6] Tests détection de sous-projets (manifestes, non-chevauchement, langage inconnu) dans tests/unit/test_monorepo.py
-- [ ] T070 [P] [US6] Test d'intégration des 3 scénarios d'acceptation US6 (site unique, graphe inter-services, sous-projet inconnu listé) dans tests/integration/test_monorepo_build.py
+- [x] T064 [P] [US6] Corpus examples/ts-demo/ : classes/interfaces TS, imports, routes Express factices, JSDoc, fichier invalide volontaire
+- [x] T065 [P] [US6] Corpus examples/java-demo/ : classes/interfaces, héritage, contrôleur Spring factice, Javadoc, main
+- [x] T066 [P] [US6] Corpus examples/monorepo-demo/ : front TS + back Python + service Java + sous-dossier langage inconnu, dépendances croisées déclarées dans les manifestes
+- [x] T067 [P] [US6] Tests contrat analyseur JS/TS (mêmes exigences que T017) dans tests/unit/test_js_analyzer.py
+- [x] T068 [P] [US6] Tests contrat analyseur Java dans tests/unit/test_java_analyzer.py
+- [x] T069 [P] [US6] Tests détection de sous-projets (manifestes, non-chevauchement, langage inconnu) dans tests/unit/test_monorepo.py
+- [x] T070 [P] [US6] Test d'intégration des 3 scénarios d'acceptation US6 (site unique, graphe inter-services, sous-projet inconnu listé) dans tests/integration/test_monorepo_build.py
 
 ### Implementation for User Story 6
 
-- [ ] T071 [US6] Analyseur JavaScript/TypeScript tree-sitter → IR (classes, fonctions, imports, appels, JSDoc, complexité) dans src/codeatlas/analyzers/javascript/analyzer.py
-- [ ] T072 [US6] Analyseur Java tree-sitter → IR (classes, interfaces, héritage/implémentation, imports, appels, Javadoc, complexité) dans src/codeatlas/analyzers/java/analyzer.py
-- [ ] T073 [US6] Détection monorepo par manifestes + arêtes `service_dep` depuis les dépendances déclarées (R8) dans src/codeatlas/monorepo/detect.py
-- [ ] T074 [US6] Reconnaisseurs de points d'entrée JS/TS (express/nest, bin) et Java (main, spring-web, JAX-RS) dans src/codeatlas/insights/entrypoints/javascript.py et src/codeatlas/insights/entrypoints/java.py
-- [ ] T075 [US6] Vue monorepo unifiée : graphe inter-services Mermaid + navigation croisée dans le builder dans src/codeatlas/renderers/mermaid/services.py et src/codeatlas/site/templates/monorepo.md.j2
+- [x] T071 [US6] Analyseur JavaScript/TypeScript tree-sitter → IR (classes, fonctions, imports, appels, JSDoc, complexité) dans src/codeatlas/analyzers/javascript/analyzer.py
+- [x] T072 [US6] Analyseur Java tree-sitter → IR (classes, interfaces, héritage/implémentation, imports, appels, Javadoc, complexité) dans src/codeatlas/analyzers/java/analyzer.py
+- [x] T073 [US6] Détection monorepo par manifestes + arêtes `service_dep` depuis les dépendances déclarées (R8) dans src/codeatlas/monorepo/detect.py
+- [x] T074 [US6] Reconnaisseurs de points d'entrée JS/TS (express/nest, bin) et Java (main, spring-web, JAX-RS) dans src/codeatlas/insights/entrypoints/javascript.py et src/codeatlas/insights/entrypoints/java.py
+- [x] T075 [US6] Vue monorepo unifiée : graphe inter-services Mermaid + navigation croisée dans le builder dans src/codeatlas/renderers/mermaid/services.py et src/codeatlas/site/templates/monorepo.md.j2
 
 **Checkpoint**: toutes les stories fonctionnelles indépendamment
 

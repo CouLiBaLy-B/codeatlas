@@ -36,28 +36,43 @@ class DiagramSpec:
     depth: int | None = None
 
 
-def analyze(path: Path, config: Config | None = None) -> CodeGraph:
-    """Analyse statique d'un dépôt → graphe de code (IR).
+def _reroot_fragment(fragment: object, prefix: str) -> None:
+    """Re-préfixe les chemins d'un fragment par le répertoire du sous-projet."""
+    from dataclasses import replace as _replace
 
-    Tolérante : les fichiers non parsables deviennent des entrées `skipped`.
-    Lève CodeAtlasError seulement si RIEN n'est analysable (constitution IV).
-    """
-    root = path.resolve()
-    if not root.is_dir():
-        raise CodeAtlasError(f"répertoire introuvable : {path}")
-    cfg = config if config is not None else load_config(root)
+    from codeatlas.analyzers.base import IRFragment
+    from codeatlas.ir.model import Location, SkippedFile
 
-    graph = CodeGraph(root=root.name)
+    assert isinstance(fragment, IRFragment)
+    if prefix in ("", "."):
+        return
+
+    def _fix(location: Location | None) -> Location | None:
+        if location is None:
+            return None
+        return Location(file=f"{prefix}/{location.file}", line=location.line)
+
+    fragment.nodes = [_replace(n, location=_fix(n.location)) for n in fragment.nodes]  # type: ignore[arg-type]
+    fragment.edges = [_replace(e, location=_fix(e.location)) for e in fragment.edges]
+    fragment.skipped = [
+        SkippedFile(path=f"{prefix}/{s.path}", reason=s.reason) for s in fragment.skipped
+    ]
+
+
+def _analyze_single(root: Path, cfg: Config, graph: CodeGraph) -> bool:
+    """Dépôt simple : tous les analyseurs disponibles sur la racine."""
     options = AnalyzerOptions(include_private=cfg.analysis.include_private)
-
     analyzed_any = False
+    main_taken = False
     for language, analyzer in available_analyzers().items():
         if cfg.analysis.languages and language not in cfg.analysis.languages:
             continue
-        subproject = SubProject(id="main", language=language, root=".")
         files, unreadable = discover_files(root, cfg.analysis.exclude, analyzer.extensions)
         if not files and not unreadable:
             continue
+        sub_id = "main" if not main_taken else f"main-{language}"
+        main_taken = True
+        subproject = SubProject(id=sub_id, language=language, root=".")
         graph.add_subproject(subproject)
         fragment = analyzer.analyze(files, subproject, options)
         for node in fragment.nodes:
@@ -66,8 +81,76 @@ def analyze(path: Path, config: Config | None = None) -> CodeGraph:
             graph.add_edge(edge)
         for skipped in (*unreadable, *fragment.skipped):
             graph.add_skipped(skipped)
-        if len(fragment.nodes) > 0:
-            analyzed_any = True
+        analyzed_any = analyzed_any or bool(fragment.nodes)
+    return analyzed_any
+
+
+def _analyze_monorepo(root: Path, cfg: Config, graph: CodeGraph, subs: list[SubProject]) -> bool:
+    """Monorepo : chaque sous-projet analysé par l'analyseur de son langage."""
+    from codeatlas.ir.model import Edge, EdgeKind
+
+    options = AnalyzerOptions(include_private=cfg.analysis.include_private)
+    analyzers = available_analyzers()
+    analyzed_any = False
+    for sub in subs:
+        graph.add_subproject(sub)
+    for sub in subs:
+        analyzer = analyzers.get(sub.language)
+        if analyzer is None:
+            continue  # langage non supporté : listé, jamais bloquant (US6 scénario 3)
+        sub_dir = root if sub.root == "." else root / sub.root
+        files, unreadable = discover_files(sub_dir, cfg.analysis.exclude, analyzer.extensions)
+        nested = [
+            other.root
+            for other in subs
+            if other.root != sub.root
+            and (sub.root == "." or other.root.startswith(f"{sub.root}/"))
+        ]
+        kept = []
+        for source in files:
+            full = source.path if sub.root == "." else f"{sub.root}/{source.path}"
+            if any(full == n or full.startswith(f"{n}/") for n in nested):
+                continue
+            kept.append(source)
+        fragment = analyzer.analyze(kept, sub, options)
+        _reroot_fragment(fragment, sub.root)
+        for node in fragment.nodes:
+            graph.add_node(node)
+        for edge in fragment.edges:
+            graph.add_edge(edge)
+        prefix = "" if sub.root == "." else f"{sub.root}/"
+        for skipped in fragment.skipped:
+            graph.add_skipped(skipped)
+        for skipped in unreadable:
+            graph.add_skipped(
+                type(skipped)(path=f"{prefix}{skipped.path}", reason=skipped.reason)
+            )
+        analyzed_any = analyzed_any or bool(fragment.nodes)
+    for sub in subs:
+        for dep_id in sub.declared_deps:
+            graph.add_edge(Edge(source=sub.id, target=dep_id, kind=EdgeKind.SERVICE_DEP))
+    return analyzed_any
+
+
+def analyze(path: Path, config: Config | None = None) -> CodeGraph:
+    """Analyse statique d'un dépôt (simple ou monorepo) → graphe de code (IR).
+
+    Tolérante : les fichiers non parsables deviennent des entrées `skipped`.
+    Lève CodeAtlasError seulement si RIEN n'est analysable (constitution IV).
+    """
+    from codeatlas.monorepo.detect import detect_subprojects
+
+    root = path.resolve()
+    if not root.is_dir():
+        raise CodeAtlasError(f"répertoire introuvable : {path}")
+    cfg = config if config is not None else load_config(root)
+
+    graph = CodeGraph(root=root.name)
+    subs = detect_subprojects(root, cfg.analysis.exclude) if cfg.monorepo.detect else []
+    if len(subs) > 1:
+        analyzed_any = _analyze_monorepo(root, cfg, graph, subs)
+    else:
+        analyzed_any = _analyze_single(root, cfg, graph)
 
     if not analyzed_any:
         raise CodeAtlasError(
