@@ -14,12 +14,12 @@ import shutil
 from pathlib import Path
 
 from codeatlas.config import Config
+from codeatlas.insights.patterns import detect_patterns
 from codeatlas.ir.model import CodeGraph, NodeKind
 from codeatlas.renderers.mermaid.class_diagram import render_class_diagram
 from codeatlas.renderers.mermaid.package_deps import render_package_deps
 from codeatlas.report.model import AnalysisReport, Warning_
 from codeatlas.site.i18n import labels
-from codeatlas.insights.patterns import detect_patterns
 from codeatlas.site.pages import (
     module_display_name,
     page_slug,
@@ -168,6 +168,33 @@ def build(graph: CodeGraph, out: Path, config: Config) -> AnalysisReport:
             diagram = render_class_diagram(graph, module.id, config.analysis.include_private)
             if "class " in diagram:  # n'émet un artefact que si le module a des classes
                 _write(staging / "diagrams" / f"{slug}.mmd", diagram)
+
+        # Pages manuelles [site].extra_nav : préservées depuis la sortie précédente,
+        # échafaudées au premier build — JAMAIS écrasées (contrat cli.md).
+        for extra in config.site.extra_nav:
+            target = docs / extra
+            previous = out / "docs" / extra
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if previous.is_file():
+                shutil.copyfile(previous, target)
+            elif not target.exists():
+                stub = (
+                    f"# {extra}\n\n"
+                    "<!-- Page manuelle : ce fichier ne sera jamais écrasé par CodeAtlas. -->\n"
+                )
+                _write(target, stub)
+
+        if config.site.svg_export:
+            report.warnings.append(
+                Warning_(
+                    code="svg-unavailable",
+                    where="site",
+                    detail=(
+                        "export SVG non supporté dans cette version (nécessite un moteur "
+                        "JS) — option ignorée, les diagrammes restent en Mermaid (.mmd)"
+                    ),
+                )
+            )
 
         assets_dir = docs / "assets"
         assets_dir.mkdir(parents=True, exist_ok=True)

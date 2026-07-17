@@ -1,5 +1,7 @@
 /** Coquille applicative du front. */
 
+import { formatPrice } from 'shared-lib';
+
 /** Racine de l'interface. */
 export class AppShell {
   title: string;
@@ -10,6 +12,6 @@ export class AppShell {
 
   /** Rend l'application. */
   render(): string {
-    return `<main>${this.title}</main>`;
+    return `<main>${this.title} — ${formatPrice(9.9)}</main>`;
   }
 }

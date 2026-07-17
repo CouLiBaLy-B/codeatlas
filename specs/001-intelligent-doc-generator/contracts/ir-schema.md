@@ -66,7 +66,7 @@ nommément). Duck typing, réflexion, imports dynamiques, dispatch par variable 
 {
   "ir_version": 1,
   "root": "…",
-  "subprojects": [ { "id": "…", "language": "…", "root": "…", "manifest": "…" } ],
+  "subprojects": [ { "id": "…", "language": "…", "root": "…", "manifest": "…", "name": "…" } ],
   "nodes": [ { "id": "…", "kind": "class", "…": "…" } ],
   "edges": [ { "source": "…", "target": "…", "kind": "inherits", "certainty": "certain" } ],
   "skipped": [ { "path": "…", "reason": "…" } ]

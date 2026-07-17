@@ -95,6 +95,8 @@ def _analyze_monorepo(root: Path, cfg: Config, graph: CodeGraph, subs: list[SubP
     for sub in subs:
         graph.add_subproject(sub)
     for sub in subs:
+        if cfg.analysis.languages and sub.language not in cfg.analysis.languages:
+            continue  # filtre [analysis].languages (FR-017, T087)
         analyzer = analyzers.get(sub.language)
         if analyzer is None:
             continue  # langage non supporté : listé, jamais bloquant (US6 scénario 3)
@@ -129,6 +131,19 @@ def _analyze_monorepo(root: Path, cfg: Config, graph: CodeGraph, subs: list[SubP
     for sub in subs:
         for dep_id in sub.declared_deps:
             graph.add_edge(Edge(source=sub.id, target=dep_id, kind=EdgeKind.SERVICE_DEP))
+    # imports croisés détectés dans les sources (T085) : ext-import:<nom de package>
+    name_to_id = {sub.name: sub.id for sub in subs if sub.name}
+    for module in graph.iter_nodes():
+        if module.kind.value != "module":
+            continue
+        for modifier in sorted(module.modifiers):
+            if not modifier.startswith("ext-import:"):
+                continue
+            target_id = name_to_id.get(modifier.removeprefix("ext-import:"))
+            if target_id is not None and target_id != module.subproject:
+                graph.add_edge(
+                    Edge(source=module.subproject, target=target_id, kind=EdgeKind.SERVICE_DEP)
+                )
     return analyzed_any
 
 
@@ -146,7 +161,11 @@ def analyze(path: Path, config: Config | None = None) -> CodeGraph:
     cfg = config if config is not None else load_config(root)
 
     graph = CodeGraph(root=root.name)
-    subs = detect_subprojects(root, cfg.analysis.exclude) if cfg.monorepo.detect else []
+    subs = (
+        detect_subprojects(root, cfg.analysis.exclude, roots=tuple(cfg.monorepo.roots))
+        if cfg.monorepo.detect
+        else []
+    )
     if len(subs) > 1:
         analyzed_any = _analyze_monorepo(root, cfg, graph, subs)
     else:
@@ -202,14 +221,20 @@ def render_diagram(graph: CodeGraph, spec: DiagramSpec, config: Config | None = 
         node_id = _resolve_focus(graph, spec.focus, (NodeKind.FUNCTION, NodeKind.METHOD))
         return render_call_flow(graph, node_id, spec.depth or cfg.graphs.call_depth)
     if spec.type == "class":
+        from codeatlas.renderers.mermaid.class_diagram import render_class_neighborhood
+
         node_id = _resolve_focus(
             graph,
             spec.focus,
             (NodeKind.MODULE, NodeKind.CLASS, NodeKind.INTERFACE, NodeKind.ENUM),
         )
         node = graph.nodes[node_id]
-        module_id = node_id if node.kind is NodeKind.MODULE else node_id.rsplit(".", 1)[0]
-        return render_class_diagram(graph, module_id, cfg.analysis.include_private)
+        if node.kind is NodeKind.MODULE:
+            return render_class_diagram(graph, node_id, cfg.analysis.include_private)
+        # classe focale : voisinage à rayon N (FR-010)
+        return render_class_neighborhood(
+            graph, node_id, spec.depth or cfg.graphs.focus_depth, cfg.analysis.include_private
+        )
     raise FocusError(f"type de diagramme inconnu : {spec.type!r}")
 
 

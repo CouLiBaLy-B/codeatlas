@@ -20,6 +20,7 @@ def _subproject_dict(subproject: SubProject) -> dict[str, Any]:
             "language": subproject.language,
             "root": subproject.root,
             "manifest": subproject.manifest,
+            "name": subproject.name,
             "declared_deps": list(subproject.declared_deps),
         }
     )

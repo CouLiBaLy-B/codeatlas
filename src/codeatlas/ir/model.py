@@ -78,6 +78,7 @@ class SubProject:
     language: str
     root: str
     manifest: str = ""
+    name: str = ""  # nom déclaré dans le manifeste (mapping des imports croisés)
     declared_deps: tuple[str, ...] = ()
 
 

@@ -132,11 +132,14 @@ class JavaScriptAnalyzer:
 
         by_stem = {m.stem: m for m in modules}
         class_registry: dict[str, NodeKind] = {}
+        class_methods: dict[str, set[str]] = {}
+        function_registry: set[str] = set()
         for module in modules:
             for node in self._declarations(module.root):
                 if node.type in _CLASS_TYPES | {"interface_declaration", "enum_declaration"}:
                     name_node = node.child_by_field_name("name")
                     if name_node is not None:
+                        qualname = f"{module.qualname}.{text(name_node)}"
                         kind = (
                             NodeKind.INTERFACE
                             if node.type == "interface_declaration"
@@ -144,13 +147,39 @@ class JavaScriptAnalyzer:
                             if node.type == "enum_declaration"
                             else NodeKind.CLASS
                         )
-                        class_registry[f"{module.qualname}.{text(name_node)}"] = kind
+                        class_registry[qualname] = kind
+                        body = node.child_by_field_name("body")
+                        methods = {
+                            text(name)
+                            for member in (body.named_children if body is not None else [])
+                            if member.type == "method_definition"
+                            and (name := member.child_by_field_name("name")) is not None
+                        }
+                        class_methods[qualname] = methods
+                elif node.type == "function_declaration":
+                    name_node = node.child_by_field_name("name")
+                    if name_node is not None:
+                        function_registry.add(f"{module.qualname}.{text(name_node)}")
+                elif node.type == "lexical_declaration":
+                    for declarator in node.named_children:
+                        if declarator.type != "variable_declarator":
+                            continue
+                        value = declarator.child_by_field_name("value")
+                        name_node = declarator.child_by_field_name("name")
+                        if (
+                            value is not None
+                            and name_node is not None
+                            and value.type in ("arrow_function", "function_expression", "function")
+                        ):
+                            function_registry.add(f"{module.qualname}.{text(name_node)}")
 
         for module in modules:
             module.bindings = self._import_bindings(module, by_stem)
 
         for module in sorted(modules, key=lambda m: m.qualname):
-            _JsModuleExtractor(module, subproject.id, class_registry, fragment).extract()
+            _JsModuleExtractor(
+                module, subproject.id, class_registry, class_methods, function_registry, fragment
+            ).extract()
 
         fragment.nodes.sort(key=lambda n: n.id)
         fragment.edges.sort(key=lambda e: e.key())
@@ -200,11 +229,15 @@ class _JsModuleExtractor:
         module: _Module,
         subproject_id: str,
         class_registry: dict[str, NodeKind],
+        class_methods: dict[str, set[str]],
+        function_registry: set[str],
         fragment: IRFragment,
     ) -> None:
         self.module = module
         self.sub = subproject_id
         self.class_registry = class_registry
+        self.class_methods = class_methods
+        self.function_registry = function_registry
         self.fragment = fragment
         self.module_id = f"{subproject_id}/{module.qualname}"
 
@@ -228,6 +261,7 @@ class _JsModuleExtractor:
         modifiers = {
             f"route:{verb} {path}" for verb, path in self._route_registrations()
         }
+        modifiers |= {f"ext-import:{package}" for package in self._external_imports()}
         self.fragment.nodes.append(
             Node(
                 id=self.module_id,
@@ -280,6 +314,24 @@ class _JsModuleExtractor:
                     )
                 )
 
+    def _external_imports(self) -> list[str]:
+        """Packages non relatifs importés (T085 : graphe inter-services du monorepo)."""
+        packages: set[str] = set()
+        for statement in self.module.root.named_children:
+            if statement.type == "export_statement":
+                statement = statement.child_by_field_name("declaration") or statement
+            if statement.type != "import_statement":
+                continue
+            source_node = statement.child_by_field_name("source")
+            if source_node is None:
+                continue
+            spec = text(source_node).strip("'\"")
+            if spec.startswith("."):
+                continue
+            parts = spec.split("/")
+            packages.add("/".join(parts[:2]) if spec.startswith("@") else parts[0])
+        return sorted(packages)
+
     def _route_registrations(self) -> list[tuple[str, str]]:
         routes: list[tuple[str, str]] = []
         for call in descendants(self.module.root, frozenset({"call_expression"})):
@@ -299,6 +351,64 @@ class _JsModuleExtractor:
             if first.type == "string":
                 routes.append((text(prop).upper(), text(first).strip("'\"")))
         return sorted(set(routes))
+
+    def _body_calls(self, body: TSNode) -> list[TSNode]:
+        """Nœuds d'appel du corps, sans descendre dans les déclarations imbriquées."""
+        collected: list[TSNode] = []
+        stack: list[TSNode] = [body]
+        while stack:
+            node = stack.pop()
+            for child in node.named_children:
+                if child.type in _CLASS_TYPES | {"function_declaration"}:
+                    continue
+                if child.type in ("call_expression", "new_expression"):
+                    collected.append(child)
+                stack.append(child)
+        return collected
+
+    def _extract_calls(self, body: TSNode, owner_id: str, current_class: str | None) -> None:
+        """Arêtes `calls` résolues (T083, FR-009) : constructeurs, this.x(), fonctions."""
+        targets: set[tuple[str, int]] = set()
+        for call in self._body_calls(body):
+            if call.type == "new_expression":
+                ctor = call.child_by_field_name("constructor")
+                if ctor is not None and ctor.type == "identifier":
+                    resolved = self._resolve_class(text(ctor))
+                    if resolved is not None and "constructor" in self.class_methods.get(
+                        resolved, set()
+                    ):
+                        targets.add((f"{resolved}.constructor", line_of(call)))
+                continue
+            function = call.child_by_field_name("function")
+            if function is None:
+                continue
+            if function.type == "identifier":
+                name = text(function)
+                local = f"{self.module.qualname}.{name}"
+                bound = self.module.bindings.get(name)
+                if local in self.function_registry:
+                    targets.add((local, line_of(call)))
+                elif bound is not None and bound in self.function_registry:
+                    targets.add((bound, line_of(call)))
+            elif function.type == "member_expression" and current_class is not None:
+                obj = function.child_by_field_name("object")
+                prop = function.child_by_field_name("property")
+                if (
+                    obj is not None
+                    and prop is not None
+                    and obj.type == "this"
+                    and text(prop) in self.class_methods.get(current_class, set())
+                ):
+                    targets.add((f"{current_class}.{text(prop)}", line_of(call)))
+        for target_qual, line in sorted(targets):
+            self.fragment.edges.append(
+                Edge(
+                    source=owner_id,
+                    target=self._node_id(target_qual),
+                    kind=EdgeKind.CALLS,
+                    location=Location(file=self.module.path, line=line),
+                )
+            )
 
     def _extract_class(self, node: TSNode, kind: NodeKind) -> None:
         name_node = node.child_by_field_name("name")
@@ -412,6 +522,10 @@ class _JsModuleExtractor:
                 loc=loc_of(node),
             )
         )
+        if body is not None:
+            self._extract_calls(
+                body, self._node_id(f"{parent}.{name}"), parent if is_method else None
+            )
 
     def _extract_arrow_functions(self, statement: TSNode) -> None:
         for declarator in statement.named_children:

@@ -86,6 +86,43 @@ class TestEdges:
         assert ("main/com.shop.CatalogService", "main/com.shop.Product") in imports
 
 
+class TestCalls:
+    """T083 — arêtes `calls` extraites par l'analyseur Java (FR-009)."""
+
+    def _calls(self, fragment: IRFragment) -> set[tuple[str, str]]:
+        return {(e.source, e.target) for e in fragment.edges if e.kind is EdgeKind.CALLS}
+
+    def test_local_variable_typed_call(self, fragment: IRFragment) -> None:
+        assert (
+            "main/com.shop.Application.Application.main",
+            "main/com.shop.CatalogService.CatalogService.register",
+        ) in self._calls(fragment)
+
+    def test_constructor_call_via_new(self, fragment: IRFragment) -> None:
+        assert (
+            "main/com.shop.Application.Application.main",
+            "main/com.shop.Product.Product.Product",
+        ) in self._calls(fragment)
+
+    def test_field_call_through_this(self, fragment: IRFragment) -> None:
+        assert (
+            "main/com.shop.ShopController.ShopController.createProduct",
+            "main/com.shop.CatalogService.CatalogService.register",
+        ) in self._calls(fragment)
+
+    def test_annotated_parameter_call(self, fragment: IRFragment) -> None:
+        assert (
+            "main/com.shop.CatalogService.CatalogService.register",
+            "main/com.shop.Product.Product.getName",
+        ) in self._calls(fragment)
+
+    def test_super_call_targets_parent(self, fragment: IRFragment) -> None:
+        assert (
+            "main/com.shop.DigitalProduct.DigitalProduct.priceWithTax",
+            "main/com.shop.Product.Product.priceWithTax",
+        ) in self._calls(fragment)
+
+
 class TestTolerance:
     def test_invalid_file_skipped(self, fragment: IRFragment) -> None:
         assert len(fragment.skipped) == 1

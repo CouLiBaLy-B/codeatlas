@@ -15,8 +15,8 @@ from codeatlas.insights.deadcode import find_dead_code
 from codeatlas.insights.entrypoints import detect_entrypoints
 from codeatlas.insights.metrics import STATUS_CRITICAL, STATUS_WARN, compute_metrics
 from codeatlas.insights.patterns import PatternDetection, detect_patterns
-from codeatlas.renderers.mermaid.architecture import render_architecture
 from codeatlas.ir.model import CodeGraph, Node, NodeKind, Visibility
+from codeatlas.renderers.mermaid.architecture import render_architecture
 from codeatlas.renderers.mermaid.call_flow import render_call_flow
 from codeatlas.renderers.mermaid.class_diagram import render_class_diagram
 from codeatlas.renderers.mermaid.package_deps import render_package_deps

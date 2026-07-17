@@ -77,6 +77,37 @@ def _declared_package(root: TSNode) -> str:
     return ""
 
 
+def _resolve_type_name(
+    name: str,
+    module: _Module,
+    module_names: set[str],
+    class_registry: dict[tuple[str, str], tuple[str, NodeKind]],
+) -> tuple[str, NodeKind] | None:
+    """Résout un nom de type : import explicite puis même package."""
+    for imported in module.imports:
+        if imported.rsplit(".", 1)[-1] == name and imported in module_names:
+            package = imported.rsplit(".", 1)[0] if "." in imported else ""
+            resolved = class_registry.get((package, name))
+            if resolved is not None:
+                return resolved
+    return class_registry.get((module.package, name))
+
+
+def _first_type_name(node: TSNode) -> str | None:
+    for identifier in descendants(node, frozenset({"type_identifier"})):
+        return text(identifier)
+    return None
+
+
+@dataclass(slots=True)
+class _JavaInventory:
+    """Méthodes, types de champs et parent de chaque classe — construit une fois."""
+
+    methods: dict[str, set[str]] = field(default_factory=dict)
+    field_types: dict[str, dict[str, str]] = field(default_factory=dict)
+    parent: dict[str, str] = field(default_factory=dict)
+
+
 class JavaAnalyzer:
     """Implémente le contrat LanguageAnalyzer pour Java."""
 
@@ -136,9 +167,53 @@ class JavaAnalyzer:
                             _KIND_BY_TYPE[declaration.type],
                         )
 
+        # inventaire : méthodes, types de champs, parent — pour la résolution d'appels
+        inventory = _JavaInventory()
+        for module in modules:
+            for declaration in module.root.named_children:
+                if declaration.type not in _TYPE_DECLARATIONS:
+                    continue
+                name_node = declaration.child_by_field_name("name")
+                body = declaration.child_by_field_name("body")
+                if name_node is None or body is None:
+                    continue
+                qualname = f"{module.qualname}.{text(name_node)}"
+                methods: set[str] = set()
+                fields: dict[str, str] = {}
+                for member in body.named_children:
+                    if member.type in ("method_declaration", "constructor_declaration"):
+                        member_name = member.child_by_field_name("name")
+                        if member_name is not None:
+                            methods.add(text(member_name))
+                    elif member.type == "field_declaration":
+                        type_node = member.child_by_field_name("type")
+                        type_name = _first_type_name(type_node) if type_node else None
+                        resolved = (
+                            _resolve_type_name(type_name, module, module_names, class_registry)
+                            if type_name
+                            else None
+                        )
+                        if resolved is None:
+                            continue
+                        for declarator in member.named_children:
+                            if declarator.type == "variable_declarator":
+                                field_name = declarator.child_by_field_name("name")
+                                if field_name is not None:
+                                    fields[text(field_name)] = resolved[0]
+                inventory.methods[qualname] = methods
+                inventory.field_types[qualname] = fields
+                superclass = declaration.child_by_field_name("superclass")
+                parent_name = _first_type_name(superclass) if superclass else None
+                if parent_name:
+                    resolved = _resolve_type_name(
+                        parent_name, module, module_names, class_registry
+                    )
+                    if resolved is not None:
+                        inventory.parent[qualname] = resolved[0]
+
         for module in sorted(modules, key=lambda m: m.qualname):
             _JavaModuleExtractor(
-                module, subproject.id, module_names, class_registry, fragment
+                module, subproject.id, module_names, class_registry, inventory, fragment
             ).extract()
 
         fragment.nodes.sort(key=lambda n: n.id)
@@ -154,12 +229,14 @@ class _JavaModuleExtractor:
         subproject_id: str,
         module_names: set[str],
         class_registry: dict[tuple[str, str], tuple[str, NodeKind]],
+        inventory: _JavaInventory,
         fragment: IRFragment,
     ) -> None:
         self.module = module
         self.sub = subproject_id
         self.module_names = module_names
         self.class_registry = class_registry
+        self.inventory = inventory
         self.fragment = fragment
         self.module_id = f"{subproject_id}/{module.qualname}"
 
@@ -170,14 +247,18 @@ class _JavaModuleExtractor:
         return Location(file=self.module.path, line=line_of(node))
 
     def _resolve_type(self, name: str) -> tuple[str, NodeKind] | None:
-        """Résout un nom de type : import explicite puis même package."""
-        for imported in self.module.imports:
-            if imported.rsplit(".", 1)[-1] == name and imported in self.module_names:
-                package = imported.rsplit(".", 1)[0] if "." in imported else ""
-                resolved = self.class_registry.get((package, name))
-                if resolved is not None:
-                    return resolved
-        return self.class_registry.get((self.module.package, name))
+        return _resolve_type_name(name, self.module, self.module_names, self.class_registry)
+
+    def _method_owner(self, start_class: str, method: str) -> str | None:
+        """Classe (dans la chaîne d'héritage) qui définit `method`, sinon None."""
+        current: str | None = start_class
+        for _ in range(8):  # garde-fou contre un cycle d'héritage
+            if current is None:
+                return None
+            if method in self.inventory.methods.get(current, set()):
+                return current
+            current = self.inventory.parent.get(current)
+        return None
 
     def extract(self) -> None:
         module = self.module
@@ -327,3 +408,78 @@ class _JavaModuleExtractor:
                 loc=loc_of(member),
             )
         )
+        if body is not None:
+            self._extract_calls(member, body, class_qual, f"{class_qual}.{name}")
+
+    def _extract_calls(
+        self, member: TSNode, body: TSNode, class_qual: str, owner_qual: str
+    ) -> None:
+        """Arêtes `calls` résolues par types déclarés (T083, FR-009)."""
+        var_types: dict[str, str] = {}
+        parameters = member.child_by_field_name("parameters")
+        if parameters is not None:
+            for parameter in parameters.named_children:
+                if parameter.type != "formal_parameter":
+                    continue
+                type_node = parameter.child_by_field_name("type")
+                name_node = parameter.child_by_field_name("name")
+                type_name = _first_type_name(type_node) if type_node else None
+                resolved = self._resolve_type(type_name) if type_name else None
+                if resolved is not None and name_node is not None:
+                    var_types[text(name_node)] = resolved[0]
+        for declaration in descendants(body, frozenset({"local_variable_declaration"})):
+            type_node = declaration.child_by_field_name("type")
+            type_name = _first_type_name(type_node) if type_node else None
+            resolved = self._resolve_type(type_name) if type_name else None
+            if resolved is None:
+                continue
+            for declarator in declaration.named_children:
+                if declarator.type == "variable_declarator":
+                    name_node = declarator.child_by_field_name("name")
+                    if name_node is not None:
+                        var_types[text(name_node)] = resolved[0]
+
+        field_types = self.inventory.field_types.get(class_qual, {})
+        targets: set[tuple[str, int]] = set()
+
+        for creation in descendants(body, frozenset({"object_creation_expression"})):
+            type_node = creation.child_by_field_name("type")
+            type_name = _first_type_name(type_node) if type_node else None
+            resolved = self._resolve_type(type_name) if type_name else None
+            if resolved is not None and type_name in self.inventory.methods.get(resolved[0], set()):
+                targets.add((f"{resolved[0]}.{type_name}", line_of(creation)))
+
+        for invocation in descendants(body, frozenset({"method_invocation"})):
+            name_node = invocation.child_by_field_name("name")
+            if name_node is None:
+                continue
+            method = text(name_node)
+            obj = invocation.child_by_field_name("object")
+            owner_class: str | None = None
+            if obj is None or obj.type == "this":
+                owner_class = class_qual
+            elif obj.type == "super":
+                owner_class = self.inventory.parent.get(class_qual)
+            elif obj.type == "identifier":
+                identifier = text(obj)
+                owner_class = var_types.get(identifier) or field_types.get(identifier)
+            elif obj.type == "field_access":
+                inner = obj.child_by_field_name("object")
+                field_node = obj.child_by_field_name("field")
+                if inner is not None and inner.type == "this" and field_node is not None:
+                    owner_class = field_types.get(text(field_node))
+            if owner_class is None:
+                continue
+            defining = self._method_owner(owner_class, method)
+            if defining is not None:
+                targets.add((f"{defining}.{method}", line_of(invocation)))
+
+        for target_qual, line in sorted(targets):
+            self.fragment.edges.append(
+                Edge(
+                    source=self._node_id(owner_qual),
+                    target=self._node_id(target_qual),
+                    kind=EdgeKind.CALLS,
+                    location=Location(file=self.module.path, line=line),
+                )
+            )

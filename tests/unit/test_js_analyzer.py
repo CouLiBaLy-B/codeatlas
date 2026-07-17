@@ -68,6 +68,11 @@ class TestNodes:
         assert "route:GET /products" in modifiers
         assert "route:POST /products" in modifiers
 
+    def test_external_imports_recorded_on_module(self, fragment: IRFragment) -> None:
+        # T085 : les imports non relatifs sont mémorisés pour le graphe inter-services
+        by_id = {n.id: n for n in fragment.nodes}
+        assert "ext-import:express" in by_id["main/src.server"].modifiers
+
 
 class TestEdges:
     def test_inheritance_certain(self, fragment: IRFragment) -> None:
@@ -88,6 +93,29 @@ class TestEdges:
         }
         assert ("main/src.services.catalog", "main/src.models.product") in imports
         assert ("main/src.server", "main/src.services.catalog") in imports
+
+
+class TestCalls:
+    """T083 — arêtes `calls` extraites par l'analyseur JS/TS (FR-009)."""
+
+    def _calls(self, fragment: IRFragment) -> set[tuple[str, str]]:
+        return {
+            (e.source, e.target)
+            for e in fragment.edges
+            if e.kind is EdgeKind.CALLS and e.certainty is Certainty.CERTAIN
+        }
+
+    def test_constructor_call_via_new(self, fragment: IRFragment) -> None:
+        calls = self._calls(fragment)
+        register = "main/src.services.catalog.CatalogService.register"
+        assert (register, "main/src.models.product.Product.constructor") in calls
+        assert (register, "main/src.models.product.DigitalProduct.constructor") in calls
+
+    def test_this_method_call(self, fragment: IRFragment) -> None:
+        assert (
+            "main/src.models.product.Product.priceWithTax",
+            "main/src.models.product.Product.rounded",
+        ) in self._calls(fragment)
 
 
 class TestTolerance:

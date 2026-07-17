@@ -30,8 +30,8 @@ doc_coverage_warn = 60    # % en dessous duquel un module passe "warn"
 [site]
 enabled = true
 out = "codeatlas-docs"
-extra_nav = []        # pages manuelles à préserver et référencer, ex. ["guides/intro.md"]
-svg_export = false
+extra_nav = []        # pages manuelles : échafaudées au 1er build, JAMAIS écrasées ensuite
+svg_export = false    # réservé — non supporté v1 (avertissement svg-unavailable, jamais silencieux)
 
 [check]               # seuils du mode CI `codeatlas check` (FR-018)
 max_package_cycles = -1      # -1 = non vérifié

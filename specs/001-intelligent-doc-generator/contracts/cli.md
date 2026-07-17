@@ -17,7 +17,7 @@ Génère le site complet + artefacts intermédiaires.
 | `--include-private` | faux | inclut les symboles privés |
 | `--depth N` | 3 | profondeur des graphes d'appels |
 | `--site / --no-site` | `--site` | `--no-site` : artefacts .md/.mmd seuls (FR-014) |
-| `--svg` | faux | exporte aussi les diagrammes en SVG (extra `[svg]`) |
+| `--svg` | faux | réservé (export SVG non supporté v1 : avertissement explicite `svg-unavailable`, jamais silencieux) |
 | `--json-report FILE` | — | écrit l'AnalysisReport en JSON |
 | `--quiet / --verbose` | normal | verbosité console (Rich) |
 

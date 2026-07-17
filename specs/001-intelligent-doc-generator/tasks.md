@@ -282,3 +282,18 @@ Task: "T021-T023 tests d'intégration dans tests/integration/"
 (architecture) → 6. US6 (multi-langage/monorepo) — chaque incrément est validé par son
 checkpoint quickstart avant de passer au suivant, sans casser les précédents (golden
 files en garde-fou).
+
+---
+
+## Phase 10: Convergence
+
+**Purpose**: écarts constatés par /speckit-converge entre le code et la spec/plan/contrats
+(2 HIGH, 3 MEDIUM, 2 LOW — aucune violation constitutionnelle)
+
+- [x] T081 Préserver les pages manuelles référencées par `[site].extra_nav` lors de la régénération (le remplacement atomique de --out les écrase aujourd'hui) dans src/codeatlas/site/builder.py per spec Assumptions + contrat cli.md « jamais écrasées » (contradicts)
+- [x] T082 Implémenter l'export SVG des diagrammes (`--svg`, `[site].svg_export`, extra `[svg]`) ou retirer l'option et l'extra tant que non supportés — l'option est aujourd'hui silencieusement sans effet — dans src/codeatlas/site/builder.py et src/codeatlas/cli.py per FR-014 / R4 (partial)
+- [x] T083 Extraire les arêtes `calls` dans les analyseurs JS/TS et Java afin que les diagrammes de flux de leurs points d'entrée ne soient plus vides, dans src/codeatlas/analyzers/javascript/analyzer.py et src/codeatlas/analyzers/java/analyzer.py per FR-009 (partial)
+- [x] T084 Honorer `--depth` pour `diagram --type class` : rendre le voisinage à rayon N autour de la classe focale (relations inter-modules incluses) au lieu du module entier, dans src/codeatlas/api.py et src/codeatlas/renderers/mermaid/class_diagram.py per FR-010 / contrat cli.md (partial)
+- [x] T085 Détecter les imports croisés entre sous-projets et restituer la nature des liens (déclaré vs import) dans le graphe inter-services, dans src/codeatlas/monorepo/detect.py et src/codeatlas/renderers/mermaid/services.py per R8 / US6-AC2 (partial)
+- [x] T086 Implémenter `[monorepo].roots` (forcer des racines de sous-projets, surcharge de la détection) — clé validée mais sans effet — dans src/codeatlas/monorepo/detect.py per contrat config-schema.md (partial)
+- [x] T087 Appliquer le filtre `[analysis].languages` dans le mode monorepo (_analyze_monorepo l'ignore), dans src/codeatlas/api.py per FR-017 (partial)

@@ -103,6 +103,9 @@ def build(
         json_report.write_text(report_to_json(report), encoding="utf-8", newline="\n")
     if not quiet:
         render_console(report, _stderr, verbose=verbose)
+        for warning in report.warnings:
+            if warning.code == "svg-unavailable":
+                _stderr.print(f"[yellow]note SVG :[/yellow] {warning.detail}")
         _stderr.print(f"[green]Documentation générée dans[/green] {out}")
     sys.exit(EXIT_OK)
 

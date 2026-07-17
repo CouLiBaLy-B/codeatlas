@@ -12,7 +12,7 @@ export class Product {
 
   /** Prix TTC pour un taux donné. */
   priceWithTax(rate: number = 0.2): number {
-    return this.price * (1 + rate);
+    return this.rounded(this.price * (1 + rate));
   }
 
   private rounded(value: number): number {
