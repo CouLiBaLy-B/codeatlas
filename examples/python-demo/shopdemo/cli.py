@@ -2,21 +2,23 @@
 
 from __future__ import annotations
 
-import sys
+import click
 
+from shopdemo.quality import tangled_pricing
 from shopdemo.services.orders import OrderService
 
 
-def main(argv: list[str] | None = None) -> int:
+@click.command()
+@click.option("--customer", default="demo", help="Nom du client de démonstration.")
+def main(customer: str) -> None:
     """Passe une commande de démonstration et affiche son total."""
-    args = argv if argv is not None else sys.argv[1:]
     service = OrderService()
     service.catalog.register("clavier", 49.9)
     service.catalog.register("ebook-python", 12.0, digital=True)
-    order = service.place("demo", {"clavier": 1, "ebook-python": 2})
-    print(f"total: {service.total_after_discount(order):.2f} ({len(args)} args)")
-    return 0
+    order = service.place(customer, {"clavier": 1, "ebook-python": 2})
+    total = service.total_after_discount(order)
+    print(f"total: {tangled_pricing(total, 'eu', False, None):.2f}")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

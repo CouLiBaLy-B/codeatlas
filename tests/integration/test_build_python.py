@@ -94,7 +94,8 @@ class TestScenario4DoubleRunIdentique:
         _, report_text = built
         report = json.loads(report_text)
         assert report["report_version"] == 1
-        assert report["counts"]["files_analyzed"] == 13
+        # 15 modules analysables dans le corpus (webapp et quality inclus)
+        assert report["counts"]["files_analyzed"] == 15
         assert report["counts"]["nodes"] > 30
 
 

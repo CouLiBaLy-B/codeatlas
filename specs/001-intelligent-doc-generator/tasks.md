@@ -97,19 +97,19 @@ profondeur réglable, liens incertains distingués ; commande `codeatlas diagram
 
 ### Tests for User Story 2 (test-first ⚠️)
 
-- [ ] T033 [P] [US2] Enrichir examples/python-demo/ : CLI Click factice, routes FastAPI factices, chaînes d'appels profondes, appels dynamiques (getattr) pour les cas `inferred`
-- [ ] T034 [P] [US2] Tests résolution d'appels (locaux, importés, méthodes → `certain` ; dynamiques → `inferred` ; non résolus comptés) dans tests/unit/test_call_resolution.py
-- [ ] T035 [P] [US2] Tests reconnaisseurs de points d'entrée Python (main, click, fastapi) dans tests/unit/test_entrypoints.py
-- [ ] T036 [P] [US2] Golden tests diagrammes de flux (profondeur exacte, pointillés inferred, légende) dans tests/golden/test_call_flow.py
-- [ ] T037 [P] [US2] Test d'intégration des 3 scénarios d'acceptation US2 dans tests/integration/test_call_graphs.py
+- [x] T033 [P] [US2] Enrichir examples/python-demo/ : CLI Click factice, routes FastAPI factices, chaînes d'appels profondes, appels dynamiques (getattr) pour les cas `inferred`
+- [x] T034 [P] [US2] Tests résolution d'appels (locaux, importés, méthodes → `certain` ; dynamiques → `inferred` ; non résolus comptés) dans tests/unit/test_call_resolution.py
+- [x] T035 [P] [US2] Tests reconnaisseurs de points d'entrée Python (main, click, fastapi) dans tests/unit/test_entrypoints.py
+- [x] T036 [P] [US2] Golden tests diagrammes de flux (profondeur exacte, pointillés inferred, légende) dans tests/golden/test_call_flow.py
+- [x] T037 [P] [US2] Test d'intégration des 3 scénarios d'acceptation US2 dans tests/integration/test_call_graphs.py
 
 ### Implementation for User Story 2
 
-- [ ] T038 [US2] Extraction des appels dans l'analyseur Python (table des symboles importés, arêtes `calls` avec certitude — R6) dans src/codeatlas/analyzers/python/calls.py
-- [ ] T039 [US2] Registre EntryPointRecognizer + reconnaisseurs Python (`__main__`, click/typer/argparse, fastapi/flask/django) dans `src/codeatlas/insights/entrypoints/__init__.py` et src/codeatlas/insights/entrypoints/python.py
-- [ ] T040 [US2] Renderer Mermaid call flow (BFS borné par --depth, style inferred, légende) dans src/codeatlas/renderers/mermaid/call_flow.py
-- [ ] T041 [US2] Pages « Points d'entrée » dans le site (template + intégration builder) dans src/codeatlas/site/templates/entrypoints.md.j2
-- [ ] T042 [US2] Commande `codeatlas diagram` (--type class|deps|calls, --focus, --depth, sortie stdout/.mmd) + api.render_diagram dans src/codeatlas/cli.py
+- [x] T038 [US2] Extraction des appels dans l'analyseur Python (table des symboles importés, arêtes `calls` avec certitude — R6) dans src/codeatlas/analyzers/python/calls.py
+- [x] T039 [US2] Registre EntryPointRecognizer + reconnaisseurs Python (`__main__`, click/typer/argparse, fastapi/flask/django) dans `src/codeatlas/insights/entrypoints/__init__.py` et src/codeatlas/insights/entrypoints/python.py
+- [x] T040 [US2] Renderer Mermaid call flow (BFS borné par --depth, style inferred, légende) dans src/codeatlas/renderers/mermaid/call_flow.py
+- [x] T041 [US2] Pages « Points d'entrée » dans le site (template + intégration builder) dans src/codeatlas/site/templates/entrypoints.md.j2
+- [x] T042 [US2] Commande `codeatlas diagram` (--type class|deps|calls, --focus, --depth, sortie stdout/.mmd) + api.render_diagram dans src/codeatlas/cli.py
 
 **Checkpoint**: US1 + US2 fonctionnelles indépendamment
 
@@ -124,16 +124,16 @@ probablement mort avec confiance ; statuts visuels ok/warn/critical.
 
 ### Tests for User Story 3 (test-first ⚠️)
 
-- [ ] T043 [P] [US3] Enrichir examples/python-demo/ : fonction volontairement complexe (> 20), fonctions non documentées, fonction morte privée + fonction morte publique (confiances différentes)
-- [ ] T044 [P] [US3] Tests métriques avec valeurs exactes attendues sur le corpus (complexité, loc, fan-in/out, doc coverage, statuts seuils) dans tests/unit/test_metrics.py
-- [ ] T045 [P] [US3] Tests code mort (atteignabilité + références, niveaux de confiance) dans tests/unit/test_deadcode.py
-- [ ] T046 [P] [US3] Test d'intégration des 3 scénarios d'acceptation US3 (dont déterminisme des métriques) dans tests/integration/test_health.py
+- [x] T043 [P] [US3] Enrichir examples/python-demo/ : fonction volontairement complexe (> 20), fonctions non documentées, fonction morte privée + fonction morte publique (confiances différentes)
+- [x] T044 [P] [US3] Tests métriques avec valeurs exactes attendues sur le corpus (complexité, loc, fan-in/out, doc coverage, statuts seuils) dans tests/unit/test_metrics.py
+- [x] T045 [P] [US3] Tests code mort (atteignabilité + références, niveaux de confiance) dans tests/unit/test_deadcode.py
+- [x] T046 [P] [US3] Test d'intégration des 3 scénarios d'acceptation US3 (dont déterminisme des métriques) dans tests/integration/test_health.py
 
 ### Implementation for User Story 3
 
-- [ ] T047 [US3] Insight metrics (agrégations par module, statuts par seuils configurables — R5) dans src/codeatlas/insights/metrics.py
-- [ ] T048 [US3] Insight deadcode (non-atteignable depuis les points d'entrée ET sans référence entrante, confiance dégradée si public/exporté — R7) dans src/codeatlas/insights/deadcode.py
-- [ ] T049 [US3] Page « Santé du code » (tableaux triés, statuts visuels, liens vers les symboles) dans src/codeatlas/site/templates/health.md.j2 + intégration builder
+- [x] T047 [US3] Insight metrics (agrégations par module, statuts par seuils configurables — R5) dans src/codeatlas/insights/metrics.py
+- [x] T048 [US3] Insight deadcode (non-atteignable depuis les points d'entrée ET sans référence entrante, confiance dégradée si public/exporté — R7) dans src/codeatlas/insights/deadcode.py
+- [x] T049 [US3] Page « Santé du code » (tableaux triés, statuts visuels, liens vers les symboles) dans src/codeatlas/site/templates/health.md.j2 + intégration builder
 
 **Checkpoint**: US1–US3 fonctionnelles indépendamment
 
@@ -148,16 +148,16 @@ GitHub Action officielle qui build + publie sur Pages.
 
 ### Tests for User Story 4 (test-first ⚠️)
 
-- [ ] T050 [P] [US4] Tests mode check (chaque seuil : passe/échoue, exit codes, cumul des violations) dans tests/unit/test_check.py
-- [ ] T051 [P] [US4] Golden test du schéma AnalysisReport JSON (report_version, clés triées, duration exclue de la comparaison) dans tests/golden/test_report_json.py
-- [ ] T052 [P] [US4] Test d'intégration scénario US4 (build → modification du corpus → check détecte la régression) dans tests/integration/test_check_mode.py
+- [x] T050 [P] [US4] Tests mode check (chaque seuil : passe/échoue, exit codes, cumul des violations) dans tests/unit/test_check.py
+- [x] T051 [P] [US4] Golden test du schéma AnalysisReport JSON (report_version, clés triées, duration exclue de la comparaison) dans tests/golden/test_report_json.py
+- [x] T052 [P] [US4] Test d'intégration scénario US4 (build → modification du corpus → check détecte la régression) dans tests/integration/test_check_mode.py
 
 ### Implementation for User Story 4
 
-- [ ] T053 [US4] Évaluation des seuils + api.run_checks (max_package_cycles, min_doc_coverage, max_critical_symbols) dans src/codeatlas/insights/checks.py
-- [ ] T054 [US4] Commande `codeatlas check` (options du contrat cli.md, exit 3, --json-report) dans src/codeatlas/cli.py
-- [ ] T055 [US4] Export AnalysisReport JSON conforme au schéma de cli.md dans src/codeatlas/report/json.py
-- [ ] T056 [US4] GitHub Action composite (install + build + upload Pages, inputs path/config/out) dans action/action.yml + doc d'usage action/README.md
+- [x] T053 [US4] Évaluation des seuils + api.run_checks (max_package_cycles, min_doc_coverage, max_critical_symbols) dans src/codeatlas/insights/checks.py
+- [x] T054 [US4] Commande `codeatlas check` (options du contrat cli.md, exit 3, --json-report) dans src/codeatlas/cli.py
+- [x] T055 [US4] Export AnalysisReport JSON conforme au schéma de cli.md dans src/codeatlas/report/json.py
+- [x] T056 [US4] GitHub Action composite (install + build + upload Pages, inputs path/config/out) dans action/action.yml + doc d'usage action/README.md
 
 **Checkpoint**: US1–US4 fonctionnelles indépendamment
 

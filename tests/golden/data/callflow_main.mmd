@@ -1,0 +1,38 @@
+flowchart TD
+    n0(["shopdemo.cli.main"])
+    n1["shopdemo.legacy.pricing.apply_legacy_discount"]
+    n2["shopdemo.models.order.Order.__init__"]
+    n3["shopdemo.models.order.Order.add"]
+    n4["shopdemo.models.order.Order.total"]
+    n5["shopdemo.models.order.OrderLine.__init__"]
+    n6["shopdemo.models.product.DigitalProduct.__init__"]
+    n7["shopdemo.models.product.Product.__init__"]
+    n8["shopdemo.quality.tangled_pricing"]
+    n9["shopdemo.services.catalog.CatalogService.__init__"]
+    n10["shopdemo.services.catalog.CatalogService.register"]
+    n11["shopdemo.services.orders.OrderService.__init__"]
+    n12["shopdemo.services.orders.OrderService.place"]
+    n13["shopdemo.services.orders.OrderService.total_after_discount"]
+    n14["shopdemo.services.orders._default_repo"]
+    n15["shopdemo.storage.repo.InMemoryRepo.__init__"]
+    n16["shopdemo.storage.repo.InMemoryRepo.find"]
+    n17["shopdemo.storage.repo.InMemoryRepo.save"]
+    n0 --> n8
+    n0 --> n10
+    n0 --> n11
+    n0 --> n12
+    n0 --> n13
+    n2 --> n5
+    n2 --> n7
+    n3 --> n5
+    n10 --> n6
+    n10 --> n7
+    n10 --> n17
+    n11 --> n9
+    n11 --> n14
+    n12 --> n2
+    n12 --> n3
+    n12 --> n16
+    n13 --> n1
+    n13 --> n4
+    n14 --> n15

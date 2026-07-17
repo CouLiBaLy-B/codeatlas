@@ -1,0 +1,27 @@
+{
+  "checks": [],
+  "counts": {
+    "edges_certain": 48,
+    "edges_inferred": 1,
+    "files_analyzed": 15,
+    "files_skipped": 1,
+    "nodes": 67
+  },
+  "duration_seconds": 0.0,
+  "report_version": 1,
+  "root": "python-demo",
+  "skipped": [
+    {
+      "path": "shopdemo/broken/invalid_syntax.py",
+      "reason": "SyntaxError: invalid syntax (ligne 3)"
+    }
+  ],
+  "subprojects": [
+    {
+      "files_analyzed": 15,
+      "id": "main",
+      "language": "python"
+    }
+  ],
+  "warnings": []
+}

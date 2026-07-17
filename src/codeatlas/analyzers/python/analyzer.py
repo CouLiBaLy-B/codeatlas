@@ -1,7 +1,8 @@
 """Analyseur Python : `ast` natif → fragment d'IR (adapté du projet gendoc).
 
-Deux passes : (A) parse + inventaire des classes de tous les modules,
-(B) extraction des nœuds et arêtes avec résolution des noms importés.
+Passes : (A) parse tolérant ; (B) inventaire global — modules, classes, fonctions,
+imports/bindings, types d'attributs et de variables de module ; (C) extraction des
+nœuds et arêtes, dont les appels (`calls.py`).
 Un fichier invalide devient une entrée `skipped` — jamais une exception
 (constitution IV).
 """
@@ -10,10 +11,17 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import ClassVar
 
 from codeatlas.analyzers.base import AnalyzerOptions, IRFragment, SourceFile
+from codeatlas.analyzers.python.calls import (
+    CallExtractor,
+    ClassInfo,
+    GlobalContext,
+    annotation_class,
+    resolve_class_name,
+)
 from codeatlas.analyzers.python.complexity import cyclomatic_complexity
 from codeatlas.ir.model import (
     Certainty,
@@ -60,6 +68,18 @@ def _doc_info(
 def _loc(node: ast.stmt) -> int:
     end = getattr(node, "end_lineno", None) or node.lineno
     return end - node.lineno + 1
+
+
+def _is_main_guard(test: ast.expr) -> bool:
+    """Reconnaît `__name__ == "__main__"` (dans les deux sens)."""
+    if not (isinstance(test, ast.Compare) and len(test.comparators) == 1):
+        return False
+    operands = [test.left, test.comparators[0]]
+    has_name = any(isinstance(op, ast.Name) and op.id == "__name__" for op in operands)
+    has_main = any(
+        isinstance(op, ast.Constant) and op.value == "__main__" for op in operands
+    )
+    return has_name and has_main
 
 
 def _format_signature(fn: ast.FunctionDef | ast.AsyncFunctionDef, is_method: bool) -> str:
@@ -117,6 +137,91 @@ class _ParsedModule:
     is_package: bool
     tree: ast.Module
     line_count: int
+    import_edges: list[tuple[str, int]] = field(default_factory=list)
+    bindings: dict[str, str] = field(default_factory=dict)
+
+
+def _resolve_import_from(module: _ParsedModule, node: ast.ImportFrom) -> str | None:
+    if node.level == 0:
+        return node.module
+    # import relatif : point de départ = package courant
+    parts = module.qualname.split(".")
+    if not module.is_package:
+        parts = parts[:-1]
+    ascend = node.level - 1
+    if ascend > len(parts):
+        return None
+    base = parts[: len(parts) - ascend] if ascend else parts
+    if node.module:
+        return ".".join((*base, node.module)) if base else node.module
+    return ".".join(base) or None
+
+
+def _collect_imports(
+    module: _ParsedModule, module_names: set[str]
+) -> tuple[list[tuple[str, int]], dict[str, str]]:
+    """(arêtes d'import vers des modules analysés, alias → symbole qualifié)."""
+    edges: list[tuple[str, int]] = []
+    bindings: dict[str, str] = {}
+    for node in ast.walk(module.tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name in module_names:
+                    edges.append((alias.name, node.lineno))
+        elif isinstance(node, ast.ImportFrom):
+            target = _resolve_import_from(module, node)
+            if target is None:
+                continue
+            for alias in node.names:
+                as_module = f"{target}.{alias.name}"
+                if as_module in module_names:
+                    edges.append((as_module, node.lineno))
+                elif target in module_names:
+                    edges.append((target, node.lineno))
+                    bindings[alias.asname or alias.name] = as_module
+    return edges, bindings
+
+
+def _init_attr_types(
+    init: ast.FunctionDef | ast.AsyncFunctionDef,
+    module_q: str,
+    bindings: dict[str, str],
+    class_registry: set[str],
+) -> dict[str, str]:
+    """Types déclarés des attributs affectés dans __init__ (self.x = …)."""
+    param_types: dict[str, str] = {}
+    for arg in (*init.args.posonlyargs, *init.args.args, *init.args.kwonlyargs):
+        if arg.annotation is not None:
+            param_class = annotation_class(arg.annotation, module_q, bindings, class_registry)
+            if param_class is not None:
+                param_types[arg.arg] = param_class
+
+    types: dict[str, str] = {}
+    for statement in ast.walk(init):
+        targets: list[ast.expr] = []
+        value: ast.expr | None = None
+        annotation: ast.expr | None = None
+        if isinstance(statement, ast.Assign):
+            targets, value = statement.targets, statement.value
+        elif isinstance(statement, ast.AnnAssign):
+            targets, value, annotation = [statement.target], statement.value, statement.annotation
+        for target in targets:
+            if not (
+                isinstance(target, ast.Attribute)
+                and isinstance(target.value, ast.Name)
+                and target.value.id == "self"
+            ):
+                continue
+            resolved: str | None = None
+            if annotation is not None:
+                resolved = annotation_class(annotation, module_q, bindings, class_registry)
+            if resolved is None and isinstance(value, ast.Call):
+                resolved = resolve_class_name(value.func, module_q, bindings, class_registry)
+            if resolved is None and isinstance(value, ast.Name):
+                resolved = param_types.get(value.id)
+            if resolved is not None:
+                types.setdefault(target.attr, resolved)
+    return types
 
 
 class PythonAnalyzer:
@@ -135,7 +240,7 @@ class PythonAnalyzer:
         fragment = IRFragment()
         modules: list[_ParsedModule] = []
 
-        # Passe A : parse tolérant + inventaire global.
+        # Passe A : parse tolérant.
         for source in files:
             try:
                 tree = ast.parse(source.text)
@@ -161,18 +266,61 @@ class PythonAnalyzer:
                 )
             )
 
-        module_names = {m.qualname for m in modules}
-        class_registry = {
-            f"{module.qualname}.{stmt.name}"
-            for module in modules
-            for stmt in module.tree.body
-            if isinstance(stmt, ast.ClassDef)
-        }
+        # Passe B : inventaire global.
+        ctx = GlobalContext(module_names={m.qualname for m in modules})
+        for module in modules:
+            module.import_edges, module.bindings = _collect_imports(module, ctx.module_names)
+            ctx.module_bindings[module.qualname] = module.bindings
 
+        for module in modules:
+            for statement in module.tree.body:
+                if isinstance(statement, ast.ClassDef):
+                    qual = f"{module.qualname}.{statement.name}"
+                    ctx.class_registry.add(qual)
+                    info = ClassInfo(qualname=qual)
+                    for sub in statement.body:
+                        if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            info.methods.add(sub.name)
+                            ctx.function_registry.add(f"{qual}.{sub.name}")
+                    ctx.class_infos[qual] = info
+                elif isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    ctx.function_registry.add(f"{module.qualname}.{statement.name}")
+
+        for module in modules:
+            var_types: dict[str, str] = {}
+            for statement in module.tree.body:
+                if isinstance(statement, ast.ClassDef):
+                    info = ctx.class_infos[f"{module.qualname}.{statement.name}"]
+                    for sub in statement.body:
+                        if isinstance(sub, ast.AnnAssign) and isinstance(sub.target, ast.Name):
+                            resolved = annotation_class(
+                                sub.annotation, module.qualname, module.bindings, ctx.class_registry
+                            )
+                            if resolved is not None:
+                                info.attr_types.setdefault(sub.target.id, resolved)
+                        elif (
+                            isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef))
+                            and sub.name == "__init__"
+                        ):
+                            info.attr_types.update(
+                                _init_attr_types(
+                                    sub, module.qualname, module.bindings, ctx.class_registry
+                                )
+                            )
+                elif isinstance(statement, ast.Assign) and isinstance(statement.value, ast.Call):
+                    var_class = resolve_class_name(
+                        statement.value.func, module.qualname, module.bindings, ctx.class_registry
+                    )
+                    if var_class is not None:
+                        for target in statement.targets:
+                            if isinstance(target, ast.Name):
+                                var_types[target.id] = var_class
+            if var_types:
+                ctx.module_var_types[module.qualname] = var_types
+
+        # Passe C : extraction.
         for module in sorted(modules, key=lambda m: m.qualname):
-            _ModuleExtractor(
-                module, subproject.id, module_names, class_registry, fragment
-            ).extract()
+            _ModuleExtractor(module, subproject.id, ctx, fragment).extract()
 
         fragment.nodes.sort(key=lambda n: n.id)
         fragment.edges.sort(key=lambda e: e.key())
@@ -185,18 +333,14 @@ class _ModuleExtractor:
         self,
         module: _ParsedModule,
         subproject_id: str,
-        module_names: set[str],
-        class_registry: set[str],
+        ctx: GlobalContext,
         fragment: IRFragment,
     ) -> None:
         self.module = module
         self.sub = subproject_id
-        self.module_names = module_names
-        self.class_registry = class_registry
+        self.ctx = ctx
         self.fragment = fragment
         self.module_id = f"{subproject_id}/{module.qualname}"
-        # alias local → nom qualifié complet du symbole importé
-        self.symbol_bindings: dict[str, str] = {}
         self.seen_node_ids: set[str] = set()
 
     # -- helpers -------------------------------------------------------------
@@ -209,31 +353,28 @@ class _ModuleExtractor:
             self.seen_node_ids.add(node.id)
             self.fragment.nodes.append(node)
 
-    def _add_edge(self, source: str, target: str, kind: EdgeKind, line: int) -> None:
+    def _add_edge(
+        self,
+        source: str,
+        target: str,
+        kind: EdgeKind,
+        line: int,
+        certainty: Certainty = Certainty.CERTAIN,
+    ) -> None:
         self.fragment.edges.append(
             Edge(
                 source=source,
                 target=target,
                 kind=kind,
-                certainty=Certainty.CERTAIN,
+                certainty=certainty,
                 location=Location(file=self.module.path, line=line),
             )
         )
 
     def _resolve_class(self, expr: ast.expr) -> str | None:
-        """Résout une expression vers le nom qualifié d'une classe analysée, sinon None."""
-        if isinstance(expr, ast.Name):
-            local = f"{self.module.qualname}.{expr.id}"
-            if local in self.class_registry:
-                return local
-            bound = self.symbol_bindings.get(expr.id)
-            if bound in self.class_registry:
-                return bound
-        elif isinstance(expr, ast.Attribute):
-            dotted = ast.unparse(expr)
-            if dotted in self.class_registry:
-                return dotted
-        return None
+        return resolve_class_name(
+            expr, self.module.qualname, self.module.bindings, self.ctx.class_registry
+        )
 
     def _annotation_classes(self, annotation: ast.expr) -> list[str]:
         """Toutes les classes internes référencées dans une annotation (ex. list[X])."""
@@ -249,7 +390,11 @@ class _ModuleExtractor:
 
     def extract(self) -> None:
         module = self.module
-        modifiers = frozenset({"package"}) if module.is_package else frozenset()
+        modifiers: set[str] = {"package"} if module.is_package else set()
+        if any(
+            isinstance(stmt, ast.If) and _is_main_guard(stmt.test) for stmt in module.tree.body
+        ):
+            modifiers.add("main_guard")
         self._add_node(
             Node(
                 id=self.module_id,
@@ -258,66 +403,17 @@ class _ModuleExtractor:
                 subproject=self.sub,
                 location=Location(file=module.path, line=1),
                 doc=_doc_info(module.tree),
-                modifiers=modifiers,
+                modifiers=frozenset(modifiers),
                 loc=module.line_count,
             )
         )
-        self._extract_imports()
+        for target, line in module.import_edges:
+            self._add_edge(self.module_id, self._node_id(target), EdgeKind.IMPORTS, line)
         for statement in module.tree.body:
             if isinstance(statement, ast.ClassDef):
                 self._extract_class(statement)
             elif isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 self._extract_function(statement, parent_qual=module.qualname, is_method=False)
-
-    def _extract_imports(self) -> None:
-        for node in ast.walk(self.module.tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name in self.module_names:
-                        self._add_edge(
-                            self.module_id,
-                            self._node_id(alias.name),
-                            EdgeKind.IMPORTS,
-                            node.lineno,
-                        )
-            elif isinstance(node, ast.ImportFrom):
-                target = self._resolve_import_from(node)
-                if target is None:
-                    continue
-                for alias in node.names:
-                    as_module = f"{target}.{alias.name}"
-                    if as_module in self.module_names:
-                        # `from pkg import sous_module`
-                        self._add_edge(
-                            self.module_id,
-                            self._node_id(as_module),
-                            EdgeKind.IMPORTS,
-                            node.lineno,
-                        )
-                        continue
-                    if target in self.module_names:
-                        self._add_edge(
-                            self.module_id,
-                            self._node_id(target),
-                            EdgeKind.IMPORTS,
-                            node.lineno,
-                        )
-                        self.symbol_bindings[alias.asname or alias.name] = as_module
-
-    def _resolve_import_from(self, node: ast.ImportFrom) -> str | None:
-        if node.level == 0:
-            return node.module
-        # import relatif : point de départ = package courant
-        parts = self.module.qualname.split(".")
-        if not self.module.is_package:
-            parts = parts[:-1]
-        ascend = node.level - 1
-        if ascend >= len(parts) and not (ascend == 0 and parts):
-            return None
-        base = parts[: len(parts) - ascend] if ascend else parts
-        if node.module:
-            return ".".join((*base, node.module)) if base else node.module
-        return ".".join(base) or None
 
     def _extract_class(self, cls: ast.ClassDef) -> None:
         qualname = f"{self.module.qualname}.{cls.name}"
@@ -347,9 +443,7 @@ class _ModuleExtractor:
         for base in cls.bases:
             resolved = self._resolve_class(base)
             if resolved is not None:
-                target_id = self._node_id(resolved)
-                kind_edge = EdgeKind.INHERITS
-                self._add_edge(class_id, target_id, kind_edge, cls.lineno)
+                self._add_edge(class_id, self._node_id(resolved), EdgeKind.INHERITS, cls.lineno)
 
         for statement in cls.body:
             if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -442,13 +536,16 @@ class _ModuleExtractor:
         if isinstance(fn, ast.AsyncFunctionDef):
             modifiers.add("async")
         for decorator in fn.decorator_list:
-            name = ast.unparse(decorator).rsplit(".", 1)[-1].split("(")[0]
+            unparsed = ast.unparse(decorator)
+            modifiers.add(f"decorator:{unparsed}")
+            name = unparsed.rsplit(".", 1)[-1].split("(")[0]
             if name in ("staticmethod", "classmethod", "property", "abstractmethod"):
                 modifiers.add(name)
 
+        fn_id = self._node_id(f"{parent_qual}.{fn.name}")
         self._add_node(
             Node(
-                id=self._node_id(f"{parent_qual}.{fn.name}"),
+                id=fn_id,
                 kind=NodeKind.METHOD if is_method else NodeKind.FUNCTION,
                 name=fn.name,
                 subproject=self.sub,
@@ -461,3 +558,11 @@ class _ModuleExtractor:
                 loc=_loc(fn),
             )
         )
+        extractor = CallExtractor(
+            self.ctx,
+            self.module.qualname,
+            parent_qual if is_method else None,
+            fn,
+        )
+        for target_qual, certainty, line in extractor.extract():
+            self._add_edge(fn_id, self._node_id(target_qual), EdgeKind.CALLS, line, certainty)

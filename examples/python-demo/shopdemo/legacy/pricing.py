@@ -14,3 +14,9 @@ def apply_legacy_discount(total: float) -> float:
 
 def audit_catalog(service: CatalogService) -> int:
     return len(service.repo.all_names())
+
+
+def refresh_catalog_price(service: CatalogService) -> float:
+    """Relit un prix via un appel dynamique — lien incertain pour l'analyse."""
+    handler = getattr(service, "price_of")
+    return float(handler("clavier"))

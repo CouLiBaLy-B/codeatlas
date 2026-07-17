@@ -6,11 +6,12 @@ La CLI n'est qu'une façade au-dessus de ces quatre fonctions :
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from codeatlas.analyzers.base import AnalyzerOptions, available_analyzers, discover_files
-from codeatlas.config import Config, load_config
-from codeatlas.ir.model import CodeGraph, SubProject
+from codeatlas.config import CheckCfg, Config, load_config
+from codeatlas.ir.model import CodeGraph, NodeKind, SubProject
 from codeatlas.report.model import AnalysisReport, CheckResult
 
 
@@ -18,8 +19,21 @@ class CodeAtlasError(Exception):
     """Erreur fatale d'exécution (exit 1 côté CLI)."""
 
 
+class FocusError(CodeAtlasError):
+    """Symbole focal introuvable ou ambigu (erreur d'usage, exit 2 côté CLI)."""
+
+
 class FeatureUnavailableError(CodeAtlasError):
     """Capacité prévue par le contrat mais pas encore livrée (story ultérieure)."""
+
+
+@dataclass(frozen=True, slots=True)
+class DiagramSpec:
+    """Spécification d'un diagramme focalisé (contrat cli.md)."""
+
+    type: str  # "class" | "deps" | "calls"
+    focus: str | None = None
+    depth: int | None = None
 
 
 def analyze(path: Path, config: Config | None = None) -> CodeGraph:
@@ -72,13 +86,54 @@ def build_site(graph: CodeGraph, out: Path, config: Config | None = None) -> Ana
     return _build(graph, out, cfg)
 
 
-def render_diagram(graph: CodeGraph, spec: object) -> str:
-    """Diagramme focalisé (US2 — `codeatlas diagram`)."""
-    raise FeatureUnavailableError(
-        "render_diagram sera livré avec la user story 2 (graphes d'appels)"
-    )
+def _resolve_focus(graph: CodeGraph, focus: str, kinds: tuple[NodeKind, ...]) -> str:
+    """Résout un nom qualifié ou un nom court non ambigu vers un id de nœud."""
+    candidates = []
+    for node in graph.iter_nodes():
+        if node.kind not in kinds:
+            continue
+        qualname = node.id.split("/", 1)[-1]
+        if node.id == focus or qualname == focus or qualname.endswith(f".{focus}"):
+            candidates.append(node.id)
+    if not candidates:
+        raise FocusError(f"symbole focal introuvable : {focus!r}")
+    if len(candidates) > 1:
+        listing = ", ".join(candidates)
+        raise FocusError(f"symbole focal ambigu : {focus!r} — candidats : {listing}")
+    return candidates[0]
 
 
-def run_checks(graph: CodeGraph, thresholds: object) -> list[CheckResult]:
-    """Seuils du mode CI (US4 — `codeatlas check`)."""
-    raise FeatureUnavailableError("run_checks sera livré avec la user story 4 (mode CI)")
+def render_diagram(graph: CodeGraph, spec: DiagramSpec, config: Config | None = None) -> str:
+    """Diagramme focalisé (`codeatlas diagram`) : class, deps ou calls."""
+    from codeatlas.renderers.mermaid.call_flow import render_call_flow
+    from codeatlas.renderers.mermaid.class_diagram import render_class_diagram
+    from codeatlas.renderers.mermaid.package_deps import render_package_deps
+
+    cfg = config if config is not None else Config()
+    if spec.type == "deps":
+        return render_package_deps(graph)
+    if spec.focus is None:
+        raise FocusError(f"--focus est requis pour un diagramme de type {spec.type!r}")
+
+    if spec.type == "calls":
+        node_id = _resolve_focus(graph, spec.focus, (NodeKind.FUNCTION, NodeKind.METHOD))
+        return render_call_flow(graph, node_id, spec.depth or cfg.graphs.call_depth)
+    if spec.type == "class":
+        node_id = _resolve_focus(
+            graph,
+            spec.focus,
+            (NodeKind.MODULE, NodeKind.CLASS, NodeKind.INTERFACE, NodeKind.ENUM),
+        )
+        node = graph.nodes[node_id]
+        module_id = node_id if node.kind is NodeKind.MODULE else node_id.rsplit(".", 1)[0]
+        return render_class_diagram(graph, module_id, cfg.analysis.include_private)
+    raise FocusError(f"type de diagramme inconnu : {spec.type!r}")
+
+
+def run_checks(
+    graph: CodeGraph, thresholds: CheckCfg, config: Config | None = None
+) -> list[CheckResult]:
+    """Évalue les seuils qualité du mode CI (`codeatlas check`)."""
+    from codeatlas.insights.checks import run_checks as _run
+
+    return _run(graph, thresholds, config if config is not None else Config())

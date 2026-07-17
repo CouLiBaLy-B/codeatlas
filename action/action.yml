@@ -1,0 +1,57 @@
+name: "CodeAtlas"
+description: >-
+  Génère la documentation CodeAtlas d'un dépôt (analyse statique : diagrammes,
+  graphes d'appels, santé du code) et peut faire échouer le job sur des seuils
+  qualité. Hors-ligne, déterministe, sans LLM.
+branding:
+  icon: "map"
+  color: "blue"
+
+inputs:
+  path:
+    description: "Racine du dépôt à analyser."
+    default: "."
+  out:
+    description: "Répertoire de sortie de la documentation."
+    default: "codeatlas-docs"
+  config:
+    description: "Fichier codeatlas.toml (optionnel)."
+    default: ""
+  python-version:
+    description: "Version de Python utilisée pour exécuter CodeAtlas."
+    default: "3.12"
+  check-args:
+    description: >-
+      Arguments de `codeatlas check` (ex. "--max-package-cycles 0
+      --min-doc-coverage 60"). Vide = pas de vérification bloquante.
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install CodeAtlas
+      shell: bash
+      run: python -m pip install --quiet "codeatlas[site]"
+
+    - name: Build documentation
+      shell: bash
+      run: |
+        ARGS=()
+        if [ -n "${{ inputs.config }}" ]; then ARGS+=(--config "${{ inputs.config }}"); fi
+        codeatlas build "${{ inputs.path }}" --out "${{ inputs.out }}" "${ARGS[@]}" \
+          --json-report "${{ inputs.out }}-report.json"
+
+    - name: Quality checks
+      if: ${{ inputs.check-args != '' }}
+      shell: bash
+      run: codeatlas check "${{ inputs.path }}" ${{ inputs.check-args }}
+
+    - name: Upload site artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: codeatlas-docs
+        path: ${{ inputs.out }}/site
