@@ -21,6 +21,7 @@ codeatlas build examples/python-demo --out /tmp/atlas-demo
 ```
 
 **Attendu** :
+
 - exit code 0 ; résumé console : fichiers analysés, 1 fichier ignoré (le
   `invalid_syntax.py` volontaire du corpus), avertissements ;
 - `/tmp/atlas-demo/site/` : site navigable hors-ligne (ouvrir `index.html` sans
@@ -66,9 +67,14 @@ codeatlas check examples/python-demo --min-doc-coverage 10 ; echo "exit=$?"   # 
 
 ## Validation P3 — Architecture & patterns
 
-**Attendu** : vue « Architecture » — couches détectées du corpus en couches, la
-violation volontaire signalée avec ses indices ; pages des classes du corpus patterns
-mentionnant Singleton/Factory/Observer avec les indices de détection.
+```bash
+codeatlas build examples/layered-demo --out /tmp/atlas-layered
+```
+
+**Attendu** : vue « Architecture » — couches api/domain/infra détectées, la violation
+volontaire (infra → api via `legacy_bridge`) signalée avec ses indices ; pages des
+classes mentionnant singleton/factory/observer/adapter/decorator avec les indices de
+détection, et aucun des contre-exemples du corpus détecté à tort.
 
 ## Validation P3 — Monorepo polyglotte
 

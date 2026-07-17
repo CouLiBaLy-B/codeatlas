@@ -1,0 +1,18 @@
+# Configuration CodeAtlas pour documenter CodeAtlas lui-même (dogfooding).
+
+[project]
+title = "CodeAtlas"
+language = "fr"
+
+[analysis]
+exclude = [
+    "examples/**",                    # corpus de test (contient des fichiers invalides volontaires)
+    "tests/**",
+    "specs/**",
+    "action/**",
+    "src/codeatlas/site/assets/**",   # mermaid vendorisé
+]
+
+[check]
+max_package_cycles = 0
+min_doc_coverage = 45  # cliquet : état actuel 46 %, à remonter progressivement vers 60

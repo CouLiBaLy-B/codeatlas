@@ -1,0 +1,28 @@
+# {{ t.architecture }}
+
+{{ t.architecture_note }}
+
+```mermaid
+{{ diagram }}```
+
+## {{ t.violations }}
+
+{% if violations %}
+| | | {{ t.evidence }} |
+| --- | --- | --- |
+{% for violation in violations %}
+| `{{ violation.source }}` | → `{{ violation.target }}` | {{ violation.evidence | join(" ; ") }} |
+{% endfor %}
+{% else %}
+{{ t.no_violations }}
+{% endif %}
+
+## {{ t.patterns }}
+
+{% if patterns %}
+{% for entry in patterns %}
+- **{{ entry.pattern }}** — [`{{ entry.qualname }}`](modules/{{ entry.page }}.md) : {{ entry.evidence | join(" ; ") }}
+{% endfor %}
+{% else %}
+{{ t.no_patterns }}
+{% endif %}

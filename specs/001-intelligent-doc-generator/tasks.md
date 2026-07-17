@@ -221,11 +221,11 @@ manifestes, site unique avec navigation croisée et graphe inter-services.
 
 **Purpose**: finitions transverses, performance, publication
 
-- [ ] T076 [P] README.md complet (installation, usage, exemples, badges) + dogfooding : `codeatlas build` sur CodeAtlas lui-même publié en démo
-- [ ] T077 [P] Benchmark de performance (générer un corpus synthétique ~50k lignes, vérifier < 30 s — SC-001 ; machine de référence = runner GitHub Actions ubuntu-latest standard) dans tests/integration/test_performance.py (marqueur `slow`)
-- [ ] T078 Préparation release : vérification build sdist/wheel, installation de chaque extra dans un venv propre, publication TestPyPI
-- [ ] T079 Exécuter intégralement quickstart.md et corriger tout écart constaté
-- [ ] T080 Audit final constitution : couverture ≥ 80 %, double-run octet pour octet sur les 3 corpus, zéro réseau, aucune fuite de chemin absolu dans les artefacts
+- [x] T076 [P] README.md complet (installation, usage, exemples, badges) + dogfooding : `codeatlas build` sur CodeAtlas lui-même publié en démo
+- [x] T077 [P] Benchmark de performance (générer un corpus synthétique ~50k lignes, vérifier < 30 s — SC-001 ; machine de référence = runner GitHub Actions ubuntu-latest standard) dans tests/integration/test_performance.py (marqueur `slow`)
+- [x] T078 Préparation release : vérification build sdist/wheel, installation de chaque extra dans un venv propre, publication TestPyPI
+- [x] T079 Exécuter intégralement quickstart.md et corriger tout écart constaté
+- [x] T080 Audit final constitution : couverture ≥ 80 %, double-run octet pour octet sur les 3 corpus, zéro réseau, aucune fuite de chemin absolu dans les artefacts
 
 ---
 

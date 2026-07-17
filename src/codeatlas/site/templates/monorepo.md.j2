@@ -1,0 +1,14 @@
+# {{ t.monorepo }}
+
+## {{ t.services_graph }}
+
+```mermaid
+{{ diagram }}```
+
+## {{ t.subprojects }}
+
+| {{ t.subproject }} | {{ t.language }} | {{ t.files_analyzed }} | |
+| --- | --- | --- | --- |
+{% for sub in subprojects %}
+| `{{ sub.id }}` | {{ sub.language }} | {{ sub.files }} | {{ sub.note }} |
+{% endfor %}

@@ -27,36 +27,44 @@ class PatternDetection:
     confidence: str  # "high" | "medium"
 
 
+class _EdgeIndexes:
+    """Index des arêtes et des noms de classes, construits une seule fois."""
+
+    def __init__(self, graph: CodeGraph) -> None:
+        self.inherits: dict[str, list[str]] = {}
+        self.composes: dict[str, list[str]] = {}
+        self.calls_by_class: dict[str, set[str]] = {}
+        for edge in graph.edges:
+            if edge.kind in (EdgeKind.INHERITS, EdgeKind.IMPLEMENTS):
+                self.inherits.setdefault(edge.source, []).append(edge.target)
+            elif edge.kind in (EdgeKind.COMPOSES, EdgeKind.AGGREGATES):
+                self.composes.setdefault(edge.source, []).append(edge.target)
+            elif edge.kind is EdgeKind.CALLS and "." in edge.source:
+                owner = edge.source.rsplit(".", 1)[0]
+                self.calls_by_class.setdefault(owner, set()).add(edge.target)
+        self.class_by_name: dict[str, str] = {}
+        for node in graph.iter_nodes():
+            if node.kind in (NodeKind.CLASS, NodeKind.INTERFACE):
+                self.class_by_name.setdefault(node.name, node.id)
+
+
 class _ClassView:
     """Vue pratique d'une classe de l'IR pour les heuristiques."""
 
-    def __init__(self, graph: CodeGraph, node: Node) -> None:
+    def __init__(self, graph: CodeGraph, node: Node, indexes: _EdgeIndexes) -> None:
         self.graph = graph
         self.node = node
-        prefix = f"{node.id}."
+        self.indexes = indexes
         self.methods: dict[str, Node] = {}
         self.attributes: dict[str, Node] = {}
-        for member in graph.iter_nodes():
-            if not member.id.startswith(prefix) or "." in member.id.removeprefix(prefix):
-                continue
+        for member in graph.children_of(node.id):
             if member.kind is NodeKind.METHOD:
                 self.methods[member.name] = member
             elif member.kind is NodeKind.ATTRIBUTE:
                 self.attributes[member.name] = member
-
-        self.inherits: list[str] = []
-        self.composes: list[str] = []
-        self.calls_out: set[str] = set()
-        for edge in graph.edges:
-            if edge.kind in (EdgeKind.INHERITS, EdgeKind.IMPLEMENTS) and edge.source == node.id:
-                self.inherits.append(edge.target)
-            elif (
-                edge.kind in (EdgeKind.COMPOSES, EdgeKind.AGGREGATES)
-                and edge.source == node.id
-            ):
-                self.composes.append(edge.target)
-            elif edge.kind is EdgeKind.CALLS and edge.source.startswith(prefix):
-                self.calls_out.add(edge.target)
+        self.inherits: list[str] = indexes.inherits.get(node.id, [])
+        self.composes: list[str] = indexes.composes.get(node.id, [])
+        self.calls_out: set[str] = indexes.calls_by_class.get(node.id, set())
 
     def return_class(self, method: Node) -> str | None:
         """Classe analysée retournée par une méthode, d'après sa signature."""
@@ -64,13 +72,7 @@ class _ClassView:
         short = returns.strip().strip('"').strip("'")
         if not short:
             return None
-        for other in self.graph.iter_nodes():
-            if (
-                other.kind in (NodeKind.CLASS, NodeKind.INTERFACE)
-                and other.name == short.split("[")[0].split(" ")[0]
-            ):
-                return other.id
-        return None
+        return self.indexes.class_by_name.get(short.split("[")[0].split(" ")[0])
 
 
 def _detect_singleton(view: _ClassView) -> PatternDetection | None:
@@ -170,8 +172,9 @@ def _detect_adapter(view: _ClassView, graph: CodeGraph) -> PatternDetection | No
 def detect_patterns(graph: CodeGraph) -> tuple[PatternDetection, ...]:
     """Détections triées par classe — au plus un pattern par classe (le plus sûr)."""
     detections: list[PatternDetection] = []
+    indexes = _EdgeIndexes(graph)
     for node in graph.iter_nodes(NodeKind.CLASS):
-        view = _ClassView(graph, node)
+        view = _ClassView(graph, node, indexes)
         for detector in (_detect_singleton, _detect_observer, _detect_decorator):
             found = detector(view)
             if found is not None:

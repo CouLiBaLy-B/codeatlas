@@ -86,11 +86,7 @@ def compute_metrics(graph: CodeGraph, config: Config) -> HealthReport:
 
     for module in modules:
         # membres = symboles définis dans le MÊME fichier (pas les sous-modules)
-        members = [
-            n
-            for n in graph.iter_nodes()
-            if n.location.file == module.location.file and n.id != module.id
-        ]
+        members = [n for n in graph.nodes_in_file(module.location.file) if n.id != module.id]
 
         complexities = [
             n.complexity for n in members if n.complexity is not None

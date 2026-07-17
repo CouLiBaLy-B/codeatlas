@@ -1,0 +1,56 @@
+# `{{ module.qualname }}`
+{% if module.doc %}
+
+{{ module.doc }}
+{% endif %}
+{% if class_diagram %}
+
+## {{ t.class_diagram }}
+
+```mermaid
+{{ class_diagram }}```
+{% endif %}
+{% if classes %}
+
+## {{ t.classes }}
+{% for cls in classes %}
+
+### `{{ cls.name }}`
+
+{% if cls.doc %}
+{{ cls.doc }}
+{% else %}
+*{{ t.no_doc }}*
+{% endif %}
+
+*{{ t.source }} : `{{ cls.file }}:{{ cls.line }}`*
+{% if cls.pattern %}
+
+**{{ t.pattern }} : {{ cls.pattern }}** — {{ cls.pattern_evidence | join(" ; ") }}
+{% endif %}
+{% if cls.attributes %}
+
+**{{ t.attributes }}**
+
+{% for attr in cls.attributes %}
+- `{{ attr.name }}{% if attr.type %}: {{ attr.type }}{% endif %}`
+{% endfor %}
+{% endif %}
+{% if cls.methods %}
+
+**{{ t.methods }}**
+
+{% for method in cls.methods %}
+- `{{ method.name }}{{ method.signature }}`{% if method.summary %} — {{ method.summary }}{% endif +%}
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if functions %}
+
+## {{ t.functions }}
+
+{% for fn in functions %}
+- `{{ fn.name }}{{ fn.signature }}`{% if fn.summary %} — {{ fn.summary }}{% endif +%}
+{% endfor %}
+{% endif %}

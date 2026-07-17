@@ -99,8 +99,8 @@ class CallExtractor:
                 if resolved is not None:
                     self.param_types[arg.arg] = resolved
 
-    def _collect_local_types(self) -> None:
-        for node in self._walk_body():
+    def _collect_local_types(self, body_nodes: list[ast.AST]) -> None:
+        for node in body_nodes:
             if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
                 resolved = resolve_class_name(
                     node.value.func, self.module, self.bindings, self.ctx.class_registry
@@ -193,10 +193,11 @@ class CallExtractor:
 
     def extract(self) -> list[tuple[str, Certainty, int]]:
         """Liste triée de (cible, certitude, ligne) des appels résolus."""
+        body_nodes = self._walk_body()  # un seul parcours, partagé par les deux passes
         self._collect_param_types()
-        self._collect_local_types()
+        self._collect_local_types(body_nodes)
         results: set[tuple[str, str, int]] = set()
-        for node in self._walk_body():
+        for node in body_nodes:
             if isinstance(node, ast.Call):
                 resolved = self._resolve_callable(node)
                 if resolved is not None:

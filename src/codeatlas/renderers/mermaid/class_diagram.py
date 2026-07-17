@@ -28,12 +28,9 @@ def _sanitize(text: str) -> str:
 
 
 def _member_lines(graph: CodeGraph, cls: Node, include_private: bool) -> list[str]:
-    prefix = f"{cls.id}."
     attributes: list[str] = []
     methods: list[str] = []
-    for node in graph.iter_nodes():
-        if not node.id.startswith(prefix) or "." in node.id.removeprefix(prefix):
-            continue
+    for node in graph.children_of(cls.id):
         if node.visibility is Visibility.PRIVATE and not include_private:
             continue
         marker = "-" if node.visibility is Visibility.PRIVATE else "+"
@@ -58,13 +55,10 @@ def render_class_diagram(
     graph: CodeGraph, module_id: str, include_private: bool = False
 ) -> str:
     """Diagramme de classes d'un module (héritage, composition, agrégation, association)."""
-    prefix = f"{module_id}."
     classes = [
         node
-        for node in graph.iter_nodes()
+        for node in graph.children_of(module_id)
         if node.kind in (NodeKind.CLASS, NodeKind.INTERFACE, NodeKind.ENUM)
-        and node.id.startswith(prefix)
-        and "." not in node.id.removeprefix(prefix)
         and (include_private or node.visibility is not Visibility.PRIVATE)
     ]
     lines = ["classDiagram"]
@@ -78,13 +72,14 @@ def render_class_diagram(
         lines.extend(_member_lines(graph, cls, include_private))
         lines.append("    }")
 
-    short = {node_id: node_id.rsplit(".", 1)[-1] for node_id in graph.nodes}
+    def short(node_id: str) -> str:
+        return node_id.rsplit(".", 1)[-1]
 
     inheritance: list[str] = []
     for edge in graph.edges_of_kind(EdgeKind.INHERITS, EdgeKind.IMPLEMENTS):
         if edge.source in class_ids or edge.target in class_ids:
             arrow = "<|.." if edge.kind is EdgeKind.IMPLEMENTS else "<|--"
-            inheritance.append(f"    {short[edge.target]} {arrow} {short[edge.source]}")
+            inheritance.append(f"    {short(edge.target)} {arrow} {short(edge.source)}")
 
     strongest: dict[tuple[str, str], EdgeKind] = {}
     for edge in graph.edges_of_kind(EdgeKind.COMPOSES, EdgeKind.AGGREGATES, EdgeKind.ASSOCIATES):
@@ -96,7 +91,7 @@ def render_class_diagram(
             strongest[pair] = edge.kind
 
     relations = [
-        f"    {short[source]} {_RELATION_ARROWS[kind]} {short[target]}"
+        f"    {short(source)} {_RELATION_ARROWS[kind]} {short(target)}"
         for (source, target), kind in sorted(strongest.items())
     ]
     lines.extend(sorted(inheritance))

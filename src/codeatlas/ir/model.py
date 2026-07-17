@@ -123,6 +123,11 @@ class CodeGraph:
     _nodes: dict[str, Node] = field(default_factory=dict)
     _edges: dict[tuple[str, str, str, str], Edge] = field(default_factory=dict)
     _skipped: list[SkippedFile] = field(default_factory=list)
+    # caches invalidés à chaque ajout (performance : évite les tris répétés)
+    _sorted_ids: tuple[str, ...] | None = field(default=None, repr=False)
+    _sorted_edges: tuple[Edge, ...] | None = field(default=None, repr=False)
+    _children_index: dict[str, tuple[str, ...]] | None = field(default=None, repr=False)
+    _file_index: dict[str, tuple[str, ...]] | None = field(default=None, repr=False)
 
     # -- construction -------------------------------------------------------
 
@@ -137,6 +142,9 @@ class CodeGraph:
         if node.subproject not in self._subprojects:
             raise IRError(f"sous-projet inconnu pour {node.id!r} : {node.subproject!r}")
         self._nodes[node.id] = node
+        self._sorted_ids = None
+        self._children_index = None
+        self._file_index = None
 
     def add_edge(self, edge: Edge) -> None:
         if edge.kind is EdgeKind.SERVICE_DEP:
@@ -147,6 +155,7 @@ class CodeGraph:
             if endpoint not in universe:
                 raise IRError(f"extrémité d'arête inconnue : {endpoint!r} ({edge.kind.value})")
         self._edges.setdefault(edge.key(), edge)
+        self._sorted_edges = None
 
     def add_skipped(self, skipped: SkippedFile) -> None:
         self._skipped.append(skipped)
@@ -165,14 +174,40 @@ class CodeGraph:
         return self._nodes.get(node_id)
 
     def iter_nodes(self, kind: NodeKind | None = None) -> Iterator[Node]:
-        for node_id in sorted(self._nodes):
+        if self._sorted_ids is None:
+            self._sorted_ids = tuple(sorted(self._nodes))
+        for node_id in self._sorted_ids:
             node = self._nodes[node_id]
             if kind is None or node.kind is kind:
                 yield node
 
+    def children_of(self, parent_id: str, kind: NodeKind | None = None) -> list[Node]:
+        """Enfants directs d'un nœud (ex. méthodes d'une classe), triés par id."""
+        if self._children_index is None:
+            index: dict[str, list[str]] = {}
+            for node_id in sorted(self._nodes):
+                if "." in node_id:
+                    index.setdefault(node_id.rsplit(".", 1)[0], []).append(node_id)
+            self._children_index = {k: tuple(v) for k, v in index.items()}
+        children = [self._nodes[i] for i in self._children_index.get(parent_id, ())]
+        if kind is not None:
+            children = [n for n in children if n.kind is kind]
+        return children
+
+    def nodes_in_file(self, file: str) -> list[Node]:
+        """Nœuds définis dans un fichier donné, triés par id."""
+        if self._file_index is None:
+            index: dict[str, list[str]] = {}
+            for node_id in sorted(self._nodes):
+                index.setdefault(self._nodes[node_id].location.file, []).append(node_id)
+            self._file_index = {k: tuple(v) for k, v in index.items()}
+        return [self._nodes[i] for i in self._file_index.get(file, ())]
+
     @property
     def edges(self) -> tuple[Edge, ...]:
-        return tuple(self._edges[k] for k in sorted(self._edges))
+        if self._sorted_edges is None:
+            self._sorted_edges = tuple(self._edges[k] for k in sorted(self._edges))
+        return self._sorted_edges
 
     def edges_of_kind(self, *kinds: EdgeKind) -> tuple[Edge, ...]:
         wanted = set(kinds)

@@ -157,13 +157,28 @@ def _resolve_import_from(module: _ParsedModule, node: ast.ImportFrom) -> str | N
     return ".".join(base) or None
 
 
+def _iter_statements(tree: ast.Module) -> list[ast.stmt]:
+    """Toutes les instructions du module (sans visiter les expressions — perf)."""
+    statements: list[ast.stmt] = []
+    stack: list[ast.AST] = [tree]
+    while stack:
+        node = stack.pop()
+        for attr in ("body", "orelse", "finalbody", "handlers", "cases"):
+            children = getattr(node, attr, None)
+            if children:
+                stack.extend(children)
+        if isinstance(node, ast.stmt):
+            statements.append(node)
+    return statements
+
+
 def _collect_imports(
     module: _ParsedModule, module_names: set[str]
 ) -> tuple[list[tuple[str, int]], dict[str, str]]:
     """(arêtes d'import vers des modules analysés, alias → symbole qualifié)."""
     edges: list[tuple[str, int]] = []
     bindings: dict[str, str] = {}
-    for node in ast.walk(module.tree):
+    for node in _iter_statements(module.tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name in module_names:

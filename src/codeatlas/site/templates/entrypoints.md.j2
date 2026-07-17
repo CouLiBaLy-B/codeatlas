@@ -1,0 +1,14 @@
+# {{ t.entry_points }}
+
+{{ t.flow_legend }}
+{% for entry in entrypoints %}
+
+## `{{ entry.label }}`
+
+*{{ t.detected_by }} : `{{ entry.evidence }}` ({{ entry.framework }})*
+{% if entry.diagram %}
+
+```mermaid
+{{ entry.diagram }}```
+{% endif %}
+{% endfor %}

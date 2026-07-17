@@ -4,7 +4,6 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
-dist/
 build/
 .mypy_cache/
 .ruff_cache/
@@ -12,9 +11,10 @@ build/
 .coverage
 htmlcov/
 
-# Sorties de génération locales
-codeatlas-docs*/
-site/
+# Sorties de génération locales (ancrées à la racine — ne pas masquer src/codeatlas/site/)
+/codeatlas-docs*/
+/site/
+/dist/
 
 # Éditeurs / OS
 .vscode/

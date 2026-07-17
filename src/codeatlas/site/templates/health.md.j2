@@ -1,0 +1,29 @@
+# {{ t.health }}
+
+**{{ t.global_doc_coverage }} : {{ global_doc_coverage }} %**
+
+| {{ t.module }} | {{ t.loc }} | {{ t.max_complexity }} | {{ t.doc_coverage }} | {{ t.coupling }} | {{ t.status }} |
+| --- | --- | --- | --- | --- | --- |
+{% for row in modules %}
+| [`{{ row.qualname }}`](modules/{{ row.page }}.md) | {{ row.loc }} | {{ row.max_complexity }} | {{ row.doc_coverage }} % | {{ row.fan_in }}/{{ row.fan_out }} | {{ row.icon }} |
+{% endfor %}
+
+{% if worst_functions %}
+## {{ t.worst_functions }}
+
+{% for fn in worst_functions %}
+- {{ fn.icon }} `{{ fn.qualname }}` — {{ fn.value }}
+{% endfor %}
+{% endif %}
+
+## {{ t.dead_code }}
+
+{% if dead_code %}
+| {{ t.source }} | {{ t.confidence }} | |
+| --- | --- | --- |
+{% for entry in dead_code %}
+| `{{ entry.qualname }}` | {{ entry.confidence }} | {{ entry.reason }} |
+{% endfor %}
+{% else %}
+{{ t.no_dead_code }}
+{% endif %}

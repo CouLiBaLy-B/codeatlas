@@ -52,10 +52,7 @@ Homepage = "https://github.com/CouLiBaLy-B/codeatlas"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/codeatlas"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"src/codeatlas/site/assets" = "codeatlas/site/assets"
-"src/codeatlas/site/templates" = "codeatlas/site/templates"
+# les données de package (assets mermaid, templates Jinja2) sont incluses par défaut
 
 [tool.ruff]
 target-version = "py311"

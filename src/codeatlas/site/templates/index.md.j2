@@ -1,0 +1,35 @@
+# {{ title }}
+
+## {{ t.stats }}
+
+| | |
+| --- | --- |
+| {{ t.files_analyzed }} | {{ stats.files_analyzed }} |
+| {{ t.files_skipped }} | {{ stats.files_skipped }} |
+| {{ t.symbols }} | {{ stats.symbols }} |
+| {{ t.relations }} | {{ stats.relations }} |
+
+## {{ t.package_deps }}
+
+```mermaid
+{{ package_diagram }}```
+
+### {{ t.cycles }}
+
+{% if cycles %}
+{% for cycle in cycles %}
+- {{ cycle | join(" → ") }} → {{ cycle[0] }}
+{% endfor %}
+{% else %}
+{{ t.no_cycles }}
+{% endif %}
+
+{% if skipped %}
+## {{ t.skipped }}
+
+| {{ t.source }} | {{ t.skipped_reason }} |
+| --- | --- |
+{% for entry in skipped %}
+| `{{ entry.path }}` | {{ entry.reason }} |
+{% endfor %}
+{% endif %}
