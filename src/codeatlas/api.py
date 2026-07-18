@@ -185,12 +185,17 @@ def analyze(path: Path, config: Config | None = None) -> CodeGraph:
     return graph
 
 
-def build_site(graph: CodeGraph, out: Path, config: Config | None = None) -> AnalysisReport:
+def build_site(
+    graph: CodeGraph,
+    out: Path,
+    config: Config | None = None,
+    source_root: Path | None = None,
+) -> AnalysisReport:
     """Génère les artefacts (.md/.mmd) et le site dans `out` → rapport d'exécution."""
     from codeatlas.site.builder import build as _build
 
     cfg = config if config is not None else Config()
-    return _build(graph, out, cfg)
+    return _build(graph, out, cfg, source_root=source_root)
 
 
 def _resolve_focus(graph: CodeGraph, focus: str, kinds: tuple[NodeKind, ...]) -> str:

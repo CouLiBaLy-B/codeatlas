@@ -1,0 +1,7 @@
+# {{ t.changelog }}
+{% for entry in entries %}
+
+## {{ entry.label }}
+
+{{ entry.body }}
+{% endfor %}

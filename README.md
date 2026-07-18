@@ -66,6 +66,23 @@ Configuration optionnelle via `codeatlas.toml` ou `[tool.codeatlas]`
 | `codeatlas-doc[java]` | analyseur **Java** (tree-sitter) |
 | `codeatlas-doc[all]` | tout |
 
+## L'architecture sous contrôle de version
+
+Les sorties de CodeAtlas étant déterministes, **deux états du dépôt sont diffables** :
+
+```bash
+codeatlas baseline .                     # capture .codeatlas/baseline.json (committez-le)
+codeatlas diff .                         # qu'est-ce que ma branche change à l'architecture ?
+codeatlas check . --against-baseline \
+  --fail-on-new-cycles --fail-on-removed-public-api    # gate CI : exit 3 sur régression
+```
+
+Le diff liste ce qui est **apparu/disparu** — cycles, violations de couches, APIs
+publiques (signatures comprises), liens d'appel incertains, code mort — et l'Action
+peut le poster en **commentaire de PR** mis à jour à chaque push. Les baselines
+archivées (`codeatlas baseline --archive v1.2`) alimentent une page « Changelog
+architectural » du site.
+
 ## Intégration continue
 
 Une GitHub Action est fournie ([action/](action/)) : régénère la documentation à

@@ -44,6 +44,35 @@ Ajoutez après l'action :
       - uses: actions/deploy-pages@v4
 ```
 
+## Diff architectural en PR (feature 002)
+
+```yaml
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write   # requis pour pr-comment
+
+jobs:
+  codeatlas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: CouLiBaLy-B/codeatlas/action@main
+        with:
+          path: .
+          baseline: default        # .codeatlas/baseline.json (committée)
+          pr-comment: "true"
+```
+
+Chaque push de la PR met à jour **le même** commentaire (marqueur
+`codeatlas:arch-diff`) : cycles/violations/APIs apparus ou disparus, régressions en
+tête. Le gate échoue (exit 3) selon les règles `[check]` de `codeatlas.toml`
+(`fail_on_new_cycles`, `fail_on_removed_public_api`…). Workflow type : la branche
+principale rafraîchit la baseline (`codeatlas baseline . && git commit`), les PR
+comparent.
+
 ## Entrées
 
 | Entrée | Défaut | Description |
@@ -53,3 +82,5 @@ Ajoutez après l'action :
 | `config` | — | chemin d'un `codeatlas.toml` |
 | `python-version` | `3.12` | version de Python |
 | `check-args` | — | arguments de `codeatlas check` (vide = non bloquant) |
+| `baseline` | — | `default` ou chemin : active diff + gate architectural |
+| `pr-comment` | `false` | poste/met à jour le commentaire de PR |

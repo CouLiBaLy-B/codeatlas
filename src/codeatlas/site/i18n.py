@@ -59,6 +59,8 @@ LABELS: dict[str, dict[str, str]] = {
         "subproject": "Sub-project",
         "language": "Language",
         "unsupported": "language not supported — not analyzed",
+        "changelog": "Architectural changelog",
+        "initial_state": "Initial captured state.",
     },
     "fr": {
         "overview": "Vue d'ensemble",
@@ -116,6 +118,8 @@ LABELS: dict[str, dict[str, str]] = {
         "subproject": "Sous-projet",
         "language": "Langage",
         "unsupported": "langage non supporté — non analysé",
+        "changelog": "Changelog architectural",
+        "initial_state": "État initial capturé.",
     },
 }
 

@@ -280,6 +280,30 @@ def render_monorepo_page(graph: CodeGraph, config: Config) -> str | None:
     return rendered.rstrip("\n") + "\n"
 
 
+def render_changelog_page(source_root: Path, config: Config) -> str | None:
+    """Page « Changelog architectural » depuis .codeatlas/history/ ; None si vide."""
+    from codeatlas.baseline.compare import compare
+    from codeatlas.baseline.render import render_markdown_body
+    from codeatlas.baseline.store import list_archives
+
+    archives = list_archives(source_root)
+    if not archives:
+        return None
+    translations = labels(config.project.language)
+    entries = []
+    for index, (label, current) in enumerate(archives):
+        if index == 0:
+            body = translations["initial_state"]
+        else:
+            body = render_markdown_body(compare(archives[index - 1][1], current)).rstrip("\n")
+        entries.append({"label": label, "body": body})
+    entries.reverse()  # plus récent en premier
+    rendered = _environment().get_template("changelog.md.j2").render(
+        t=translations, entries=entries
+    )
+    return rendered.rstrip("\n") + "\n"
+
+
 def render_index_page(graph: CodeGraph, config: Config) -> str:
     """Page d'accueil : statistiques, dépendances de packages, cycles, ignorés."""
     translations = labels(config.project.language)

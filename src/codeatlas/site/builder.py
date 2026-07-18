@@ -24,6 +24,7 @@ from codeatlas.site.pages import (
     module_display_name,
     page_slug,
     render_architecture_page,
+    render_changelog_page,
     render_entrypoints_page,
     render_health_page,
     render_index_page,
@@ -108,7 +109,9 @@ def _build_html_site(staging: Path, report: AnalysisReport) -> None:
             os.environ["SOURCE_DATE_EPOCH"] = previous
 
 
-def build(graph: CodeGraph, out: Path, config: Config) -> AnalysisReport:
+def build(
+    graph: CodeGraph, out: Path, config: Config, source_root: Path | None = None
+) -> AnalysisReport:
     """Génère docs/, diagrams/, mkdocs.yml et (si activé) site/ dans `out`."""
     report = AnalysisReport(root=graph.root)
     report.subprojects = [
@@ -157,6 +160,12 @@ def build(graph: CodeGraph, out: Path, config: Config) -> AnalysisReport:
 
         _write(docs / "health.md", render_health_page(graph, config))
         extra_pages.append((translations["health"], "health.md"))
+
+        if source_root is not None:
+            changelog_page = render_changelog_page(source_root, config)
+            if changelog_page is not None:
+                _write(docs / "changelog.md", changelog_page)
+                extra_pages.append((translations["changelog"], "changelog.md"))
 
         patterns = {d.class_id: d for d in detect_patterns(graph)}
         for module in graph.iter_nodes(NodeKind.MODULE):

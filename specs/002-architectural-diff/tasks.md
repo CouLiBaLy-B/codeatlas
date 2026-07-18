@@ -56,9 +56,9 @@
 
 ## Phase 5: User Story 3 - Commentaire de pull request (P2)
 
-- [ ] T016 [P] [US3] Golden tests du markdown PR (marqueur en 1re ligne, régressions en tête avec icônes, API modifiées appariées, diff vide explicite, troncature à 150 lignes avec compte exact) dans tests/golden/test_pr_comment.py
-- [ ] T017 [US3] Rendu markdown PR (`diff --format markdown`) dans src/codeatlas/baseline/render.py
-- [ ] T018 [US3] Action GitHub : inputs `baseline` et `pr-comment`, étape gh api create-or-update par recherche du marqueur, copie dans $GITHUB_STEP_SUMMARY, doc d'usage dans action/action.yml et action/README.md
+- [x] T016 [P] [US3] Golden tests du markdown PR (marqueur en 1re ligne, régressions en tête avec icônes, API modifiées appariées, diff vide explicite, troncature à 150 lignes avec compte exact) dans tests/golden/test_pr_comment.py
+- [x] T017 [US3] Rendu markdown PR (`diff --format markdown`) dans src/codeatlas/baseline/render.py
+- [x] T018 [US3] Action GitHub : inputs `baseline` et `pr-comment`, étape gh api create-or-update par recherche du marqueur, copie dans $GITHUB_STEP_SUMMARY, doc d'usage dans action/action.yml et action/README.md
 
 **Checkpoint**: US3 — le diff visible en revue
 
@@ -66,9 +66,9 @@
 
 ## Phase 6: User Story 4 - Changelog architectural (P3)
 
-- [ ] T019 [P] [US4] Test d'intégration changelog (2 baselines archivées → page ordonnée par tri naturel, entrée par label avec son diff) dans tests/integration/test_changelog.py
-- [ ] T020 [US4] Archives labellisées + tri naturel documenté dans src/codeatlas/baseline/store.py
-- [ ] T021 [US4] Page changelog du site (template + builder + libellés i18n en/fr) dans src/codeatlas/site/templates/changelog.md.j2, src/codeatlas/site/builder.py, src/codeatlas/site/i18n.py
+- [x] T019 [P] [US4] Test d'intégration changelog (2 baselines archivées → page ordonnée par tri naturel, entrée par label avec son diff) dans tests/integration/test_changelog.py
+- [x] T020 [US4] Archives labellisées + tri naturel documenté dans src/codeatlas/baseline/store.py
+- [x] T021 [US4] Page changelog du site (template + builder + libellés i18n en/fr) dans src/codeatlas/site/templates/changelog.md.j2, src/codeatlas/site/builder.py, src/codeatlas/site/i18n.py
 
 **Checkpoint**: toutes les stories livrées
 
@@ -76,7 +76,7 @@
 
 ## Phase 7: Polish
 
-- [ ] T022 Exécuter quickstart.md intégralement, corriger les écarts ; section « L'architecture sous contrôle de version » dans README.md ; vérifier couverture ≥ 80 %, ruff, mypy
+- [x] T022 Exécuter quickstart.md intégralement, corriger les écarts ; section « L'architecture sous contrôle de version » dans README.md ; vérifier couverture ≥ 80 %, ruff, mypy
 
 ---
 

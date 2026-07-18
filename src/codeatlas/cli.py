@@ -127,7 +127,7 @@ def build(
     started = time.monotonic()
     try:
         graph = api.analyze(path, config)
-        report = api.build_site(graph, out, config)
+        report = api.build_site(graph, out, config, source_root=path.resolve())
     except api.CodeAtlasError as exc:
         _stderr.print(f"[red]erreur :[/red] {exc}")
         sys.exit(EXIT_FATAL)

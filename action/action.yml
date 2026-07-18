@@ -1,8 +1,9 @@
 name: "CodeAtlas"
 description: >-
   Génère la documentation CodeAtlas d'un dépôt (analyse statique : diagrammes,
-  graphes d'appels, santé du code) et peut faire échouer le job sur des seuils
-  qualité. Hors-ligne, déterministe, sans LLM.
+  graphes d'appels, santé du code), peut faire échouer le job sur des seuils
+  qualité et poster le diff architectural en commentaire de PR.
+  Hors-ligne, déterministe, sans LLM.
 branding:
   icon: "map"
   color: "blue"
@@ -25,6 +26,17 @@ inputs:
       Arguments de `codeatlas check` (ex. "--max-package-cycles 0
       --min-doc-coverage 60"). Vide = pas de vérification bloquante.
     default: ""
+  baseline:
+    description: >-
+      Active le diff architectural + gate : "default" pour
+      .codeatlas/baseline.json, ou un chemin de baseline. Les règles de
+      régression viennent de codeatlas.toml [check] (ou de check-args).
+    default: ""
+  pr-comment:
+    description: >-
+      "true" → poste/met à jour le commentaire de PR contenant le diff
+      architectural (idempotent via le marqueur codeatlas:arch-diff).
+    default: "false"
 
 runs:
   using: "composite"
@@ -45,10 +57,55 @@ runs:
         codeatlas build "${{ inputs.path }}" --out "${{ inputs.out }}" "${ARGS[@]}" \
           --json-report "${{ inputs.out }}-report.json"
 
+    - name: Architectural diff (markdown + summary)
+      if: ${{ inputs.baseline != '' }}
+      shell: bash
+      run: |
+        BASELINE_ARGS=()
+        if [ "${{ inputs.baseline }}" != "default" ]; then
+          BASELINE_ARGS+=(--baseline "${{ inputs.baseline }}")
+        fi
+        if codeatlas diff "${{ inputs.path }}" "${BASELINE_ARGS[@]}" \
+             --format markdown --out /tmp/codeatlas-arch-diff.md; then
+          cat /tmp/codeatlas-arch-diff.md >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "Diff architectural indisponible (baseline absente ?) — voir le gate." \
+            >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - name: Architectural gate
+      if: ${{ inputs.baseline != '' }}
+      shell: bash
+      run: |
+        if [ "${{ inputs.baseline }}" != "default" ]; then
+          codeatlas check "${{ inputs.path }}" --against-baseline "${{ inputs.baseline }}"
+        else
+          codeatlas check "${{ inputs.path }}" --against-baseline
+        fi
+
     - name: Quality checks
       if: ${{ inputs.check-args != '' }}
       shell: bash
       run: codeatlas check "${{ inputs.path }}" ${{ inputs.check-args }}
+
+    - name: PR comment (create or update)
+      if: ${{ always() && inputs.pr-comment == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        BODY_FILE=/tmp/codeatlas-arch-diff.md
+        [ -f "$BODY_FILE" ] || exit 0
+        MARKER='<!-- codeatlas:arch-diff -->'
+        PR=${{ github.event.pull_request.number }}
+        REPO=${{ github.repository }}
+        COMMENT_ID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+          --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -1)
+        if [ -n "$COMMENT_ID" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$COMMENT_ID" -F body=@"$BODY_FILE"
+        else
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$BODY_FILE"
+        fi
 
     - name: Upload site artifact
       uses: actions/upload-artifact@v4

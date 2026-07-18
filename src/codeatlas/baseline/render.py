@@ -111,6 +111,13 @@ def render_markdown(delta: ArchDelta) -> str:
     return "\n".join(header + _truncate(_lines(delta, markdown=True))).rstrip("\n") + "\n"
 
 
+def render_markdown_body(delta: ArchDelta) -> str:
+    """Corps markdown sans marqueur ni titre — pour la page changelog du site."""
+    if delta.is_empty:
+        return EMPTY_MESSAGE + "\n"
+    return "\n".join(_truncate(_lines(delta, markdown=True))).rstrip("\n") + "\n"
+
+
 def render_json(delta: ArchDelta) -> str:
     payload = {
         "is_empty": delta.is_empty,

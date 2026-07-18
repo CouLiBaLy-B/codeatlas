@@ -127,3 +127,22 @@ def archive(baseline: Baseline, root: Path, label: str) -> Path:
     target = history_dir(root) / f"{label}.json"
     write(baseline, target)
     return target
+
+
+def natural_key(label: str) -> tuple[object, ...]:
+    """Tri naturel documenté : les segments numériques comparés numériquement
+    (v10 > v2)."""
+    return tuple(
+        int(part) if part.isdigit() else part for part in re.split(r"(\d+)", label)
+    )
+
+
+def list_archives(root: Path) -> list[tuple[str, Baseline]]:
+    """Baselines archivées, triées par label en ordre naturel croissant."""
+    directory = history_dir(root)
+    if not directory.is_dir():
+        return []
+    entries = []
+    for path in directory.glob("*.json"):
+        entries.append((path.stem, load(path)))
+    return sorted(entries, key=lambda item: natural_key(item[0]))
