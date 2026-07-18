@@ -365,5 +365,129 @@ def diff(
     sys.exit(EXIT_OK)
 
 
+@main.command()
+@click.argument("path", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["repomap", "graph"]),
+    default="repomap",
+)
+@click.option("--budget", type=int, default=None, help="Taille max de la carte (caractères).")
+@click.option("--out", type=click.Path(path_type=Path), default=None)
+@click.option("--config", "-c", "config_file", type=click.Path(path_type=Path), default=None)
+def export(
+    path: Path,
+    output_format: str,
+    budget: int | None,
+    out: Path | None,
+    config_file: Path | None,
+) -> None:
+    """Exporte la carte du dépôt (contexte pour assistants IA) ou le graphe JSON."""
+    config = _load_config_or_exit(path, config_file)
+    try:
+        graph = api.analyze(path, config)
+        if output_format == "graph":
+            from codeatlas.ir.serialize import to_json
+
+            rendered = to_json(graph)
+        else:
+            rendered = api.export_repomap(graph, config, budget=budget)
+    except ValueError as exc:
+        _stderr.print(f"[red]erreur d'usage :[/red] {exc}")
+        sys.exit(EXIT_USAGE)
+    except api.CodeAtlasError as exc:
+        _stderr.print(f"[red]erreur :[/red] {exc}")
+        sys.exit(EXIT_FATAL)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(rendered, encoding="utf-8", newline="\n")
+    else:
+        click.echo(rendered, nl=False)
+    sys.exit(EXIT_OK)
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option("--focus", required=True, help="Symbole (nom qualifié/court) ou fichier analysé.")
+@click.option("--depth", type=int, default=None, help="Niveaux de propagation inverse.")
+@click.option("--format", "output_format", type=click.Choice(["text", "json"]), default="text")
+@click.option("--config", "-c", "config_file", type=click.Path(path_type=Path), default=None)
+def impact(
+    path: Path,
+    focus: str,
+    depth: int | None,
+    output_format: str,
+    config_file: Path | None,
+) -> None:
+    """Qu'est-ce que ça touche ? Appelants et importeurs par niveaux."""
+    import json as _json
+
+    config = _load_config_or_exit(path, config_file)
+    try:
+        graph = api.analyze(path, config)
+        report = api.compute_impact(
+            graph, focus, depth if depth is not None else config.graphs.call_depth, config
+        )
+    except api.FocusError as exc:
+        _stderr.print(f"[red]erreur d'usage :[/red] {exc}")
+        sys.exit(EXIT_USAGE)
+    except api.CodeAtlasError as exc:
+        _stderr.print(f"[red]erreur :[/red] {exc}")
+        sys.exit(EXIT_FATAL)
+
+    if output_format == "json":
+        payload = {
+            "targets": list(report.targets),
+            "levels": [
+                {
+                    "depth": level.depth,
+                    "entries": [
+                        {"id": e.id, "via": e.via, "certainty": e.certainty}
+                        for e in level.entries
+                    ],
+                }
+                for level in report.levels
+            ],
+            "entrypoints_reached": list(report.entrypoints_reached),
+        }
+        click.echo(_json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+        sys.exit(EXIT_OK)
+
+    if not report.levels:
+        click.echo("Aucun impact entrant.")
+        sys.exit(EXIT_OK)
+    click.echo(f"Impact de {focus}")
+    for level in report.levels:
+        click.echo(f"Niveau {level.depth} :")
+        for entry in level.entries:
+            marker = " (incertain)" if entry.certainty == "inferred" else ""
+            click.echo(f"  • {entry.id} [via {entry.via}]{marker}")
+    if report.entrypoints_reached:
+        click.echo("Points d'entrée atteints : " + ", ".join(report.entrypoints_reached))
+    sys.exit(EXIT_OK)
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option("--config", "-c", "config_file", type=click.Path(path_type=Path), default=None)
+def mcp(path: Path, config_file: Path | None) -> None:
+    """Serveur MCP local (stdio) : le graphe de code interrogeable par votre assistant."""
+    from codeatlas.bridge import server as bridge_server
+
+    if not bridge_server.mcp_available():
+        _stderr.print(
+            "[red]erreur d'usage :[/red] extra MCP absent — "
+            "pip install \"codeatlas-doc[mcp]\""
+        )
+        sys.exit(EXIT_USAGE)
+    config = _load_config_or_exit(path, config_file)
+    try:
+        bridge_server.run(path, config)
+    except api.CodeAtlasError as exc:  # pragma: no cover — dépôt vide
+        _stderr.print(f"[red]erreur :[/red] {exc}")
+        sys.exit(EXIT_FATAL)
+
+
 if __name__ == "__main__":  # pragma: no cover
     main()

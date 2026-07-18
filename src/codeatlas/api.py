@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:  # pragma: no cover
     from codeatlas.baseline.capture import Baseline
     from codeatlas.baseline.compare import ArchDelta
+    from codeatlas.insights.impact import ImpactReport
 
 from codeatlas.analyzers.base import AnalyzerOptions, available_analyzers, discover_files
 from codeatlas.config import CheckCfg, Config, load_config
@@ -255,6 +256,41 @@ def run_checks(
     from codeatlas.insights.checks import run_checks as _run
 
     return _run(graph, thresholds, config if config is not None else Config())
+
+
+def export_repomap(
+    graph: CodeGraph, config: Config | None = None, budget: int | None = None
+) -> str:
+    """Carte du dépôt pour assistants IA (feature 003) — markdown à budget."""
+    from codeatlas.bridge.repomap import build_repomap
+
+    return build_repomap(graph, config if config is not None else Config(), budget=budget)
+
+
+def compute_impact(
+    graph: CodeGraph, focus: str, depth: int, config: Config | None = None
+) -> ImpactReport:
+    """Analyse d'impact d'un symbole ou d'un fichier analysé (feature 003)."""
+    from codeatlas.insights.impact import compute_impact as _compute
+
+    files = {node.location.file for node in graph.iter_nodes()}
+    if focus in files:
+        targets = tuple(node.id for node in graph.nodes_in_file(focus))
+    else:
+        node_id = _resolve_focus(
+            graph,
+            focus,
+            (
+                NodeKind.MODULE,
+                NodeKind.CLASS,
+                NodeKind.INTERFACE,
+                NodeKind.ENUM,
+                NodeKind.FUNCTION,
+                NodeKind.METHOD,
+            ),
+        )
+        targets = (node_id,)
+    return _compute(graph, targets, depth)
 
 
 def capture_baseline(graph: CodeGraph, config: Config | None = None) -> Baseline:

@@ -30,6 +30,7 @@ from codeatlas.site.pages import (
     render_index_page,
     render_module_page,
     render_monorepo_page,
+    render_tour_page,
 )
 
 _ASSETS = Path(__file__).parent / "assets"
@@ -152,6 +153,11 @@ def build(
         if entrypoints_page is not None:
             _write(docs / "entrypoints.md", entrypoints_page)
             extra_pages.append((translations["entry_points"], "entrypoints.md"))
+
+        tour_page = render_tour_page(graph, config)
+        if tour_page is not None:
+            _write(docs / "tour.md", tour_page)
+            extra_pages.append((translations["tour"], "tour.md"))
 
         architecture_page = render_architecture_page(graph, config)
         if architecture_page is not None:

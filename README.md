@@ -83,6 +83,27 @@ peut le poster en **commentaire de PR** mis à jour à chaque push. Les baseline
 archivées (`codeatlas baseline --archive v1.2`) alimentent une page « Changelog
 architectural » du site.
 
+## Le substrat pour vos outils IA — sans IA
+
+CodeAtlas n'appelle jamais de LLM, mais il produit le contexte fiable dont vos
+assistants ont besoin — **sans que votre code ne quitte la machine** :
+
+```bash
+codeatlas export . --out .codeatlas/repomap.md   # carte compacte à budget, committable
+codeatlas impact . --focus InMemoryRepo.find     # « qu'est-ce que ça touche ? »
+codeatlas mcp .                                  # serveur MCP local (extra [mcp])
+```
+
+Configuration type pour Claude Code (`.mcp.json`) :
+
+```json
+{ "mcpServers": { "codeatlas": { "command": "codeatlas", "args": ["mcp", "."] } } }
+```
+
+Outils exposés : `overview`, `search_symbol`, `module_api`, `callers`/`callees`
+(certitude distinguée), `impact`, `dead_code`, `reload`. Chaque réponse vient du
+graphe — jamais d'invention.
+
 ## Intégration continue
 
 Une GitHub Action est fournie ([action/](action/)) : régénère la documentation à

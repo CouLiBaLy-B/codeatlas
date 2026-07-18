@@ -1,0 +1,7 @@
+# {{ t.tour }}
+
+{{ t.tour_note }}
+
+{% for step in steps %}
+{{ loop.index }}. [{{ step.module }}]({{ step.page }}) — {{ step.reason }}
+{% endfor %}

@@ -84,6 +84,11 @@ class CheckCfg:
 
 
 @dataclass(frozen=True, slots=True)
+class ExportCfg:
+    budget: int = 24000  # caractères de la carte repomap (≥ 2000)
+
+
+@dataclass(frozen=True, slots=True)
 class MonorepoCfg:
     detect: bool = True
     roots: tuple[str, ...] = ()
@@ -97,6 +102,7 @@ class Config:
     metrics: MetricsCfg = field(default_factory=MetricsCfg)
     site: SiteCfg = field(default_factory=SiteCfg)
     check: CheckCfg = field(default_factory=CheckCfg)
+    export: ExportCfg = field(default_factory=ExportCfg)
     monorepo: MonorepoCfg = field(default_factory=MonorepoCfg)
 
 
@@ -169,6 +175,8 @@ def _validate(config: Config) -> None:
     drop = config.check.max_doc_coverage_drop
     if drop != -1 and not 0 <= drop <= 100:
         raise ConfigError("[check].max_doc_coverage_drop : points attendus (0-100) ou -1")
+    if config.export.budget < 2000:
+        raise ConfigError("[export].budget : minimum 2000 caractères")
 
 
 def _read_toml(path: Path) -> dict[str, Any]:

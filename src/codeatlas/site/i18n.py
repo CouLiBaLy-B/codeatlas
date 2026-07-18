@@ -61,6 +61,11 @@ LABELS: dict[str, dict[str, str]] = {
         "unsupported": "language not supported — not analyzed",
         "changelog": "Architectural changelog",
         "initial_state": "Initial captured state.",
+        "tour": "Reading tour",
+        "tour_note": (
+            "Suggested onboarding order — entry points first, then layers from "
+            "presentation down to infrastructure."
+        ),
     },
     "fr": {
         "overview": "Vue d'ensemble",
@@ -120,6 +125,11 @@ LABELS: dict[str, dict[str, str]] = {
         "unsupported": "langage non supporté — non analysé",
         "changelog": "Changelog architectural",
         "initial_state": "État initial capturé.",
+        "tour": "Parcours de lecture",
+        "tour_note": (
+            "Ordre de lecture suggéré pour l'onboarding — points d'entrée d'abord, "
+            "puis les couches de la présentation vers l'infrastructure."
+        ),
     },
 }
 

@@ -280,6 +280,19 @@ def render_monorepo_page(graph: CodeGraph, config: Config) -> str | None:
     return rendered.rstrip("\n") + "\n"
 
 
+def render_tour_page(graph: CodeGraph, config: Config) -> str | None:
+    """Page « Parcours de lecture » (feature 003) ; None si moins de 2 modules."""
+    from codeatlas.insights.tour import reading_tour
+
+    steps = reading_tour(graph, config)
+    if len(steps) < 2:
+        return None
+    rendered = _environment().get_template("tour.md.j2").render(
+        t=labels(config.project.language), steps=steps
+    )
+    return rendered.rstrip("\n") + "\n"
+
+
 def render_changelog_page(source_root: Path, config: Config) -> str | None:
     """Page « Changelog architectural » depuis .codeatlas/history/ ; None si vide."""
     from codeatlas.baseline.compare import compare
