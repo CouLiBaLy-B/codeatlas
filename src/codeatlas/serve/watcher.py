@@ -52,13 +52,33 @@ class FileWatcher:
         dispatch = self._dispatch
 
         class _Handler(FileSystemEventHandler):
-            def on_any_event(self, event: Any) -> None:
+            """Ne réagit qu'aux VRAIS changements de contenu.
+
+            Surtout pas `on_any_event` : watchdog émet aussi `opened` /
+            `closed_no_write` quand un fichier est simplement LU — or chaque
+            régénération relit les sources surveillées, ce qui bouclerait la
+            session sur elle-même (rebuild → lectures → événements → rebuild).
+            """
+
+            def _report(self, event: Any) -> None:
                 if getattr(event, "is_directory", False):
                     return
                 for attribute in ("src_path", "dest_path"):
                     path = getattr(event, attribute, "")
                     if path:
                         dispatch(str(path))
+
+            def on_modified(self, event: Any) -> None:
+                self._report(event)
+
+            def on_created(self, event: Any) -> None:
+                self._report(event)
+
+            def on_deleted(self, event: Any) -> None:
+                self._report(event)
+
+            def on_moved(self, event: Any) -> None:
+                self._report(event)
 
         self._observer = Observer()
         self._observer.schedule(_Handler(), str(self.root), recursive=True)

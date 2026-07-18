@@ -29,6 +29,26 @@ def test_watcher_reports_relative_posix_paths(tmp_path: Path) -> None:
         watcher.stop()
 
 
+def test_reading_a_watched_file_triggers_nothing(tmp_path: Path) -> None:
+    """Régression : la régénération RELIT les sources surveillées — ces lectures
+    (événements watchdog `opened`/`closed_no_write`) ne doivent jamais déclencher
+    de rebuild, sinon la session boucle sur elle-même."""
+    target = tmp_path / "mod.py"
+    target.write_text("x = 1\n", encoding="utf-8")
+    seen: list[str] = []
+    watcher = FileWatcher(tmp_path, seen.append)
+    watcher.start()
+    try:
+        for _ in range(3):
+            target.read_text(encoding="utf-8")  # lecture pure, aucune écriture
+        time.sleep(1.0)  # laisse largement le temps aux événements inotify
+        assert seen == []
+        target.write_text("x = 2\n", encoding="utf-8")
+        assert _wait_for(lambda: "mod.py" in seen), seen  # les écritures, elles, passent
+    finally:
+        watcher.stop()
+
+
 def test_watcher_filters_noise(tmp_path: Path) -> None:
     seen: list[str] = []
     watcher = FileWatcher(tmp_path, seen.append)
