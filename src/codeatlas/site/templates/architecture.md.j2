@@ -1,5 +1,10 @@
 # {{ t.architecture }}
 
+{% if explorer_labels %}
+<div id="atlas-explorer" data-labels='{{ explorer_labels }}'></div>
+
+{% endif %}
+{% if diagram %}
 {{ t.architecture_note }}
 
 ```mermaid
@@ -15,6 +20,12 @@
 {% endfor %}
 {% else %}
 {{ t.no_violations }}
+{% endif %}
+{% elif fallback_diagram %}
+## {{ t.package_deps }}
+
+```mermaid
+{{ fallback_diagram }}```
 {% endif %}
 
 ## {{ t.patterns }}

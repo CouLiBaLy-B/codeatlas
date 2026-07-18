@@ -24,6 +24,17 @@
 {% endif %}
 
 *{{ t.source }} : `{{ cls.file }}:{{ cls.line }}`*
+{% if cls.excerpt %}
+
+??? note "{{ t.source }} : `{{ cls.excerpt.path }}:{{ cls.excerpt.start_line }}-{{ cls.excerpt.end_line }}`"
+
+    ```{{ lang }}
+{{ cls.excerpt.code | indent(4, true) }}
+    ```
+{% elif cls.source_missing %}
+
+*{{ t.source_unavailable }}*
+{% endif %}
 {% if cls.pattern %}
 
 **{{ t.pattern }} : {{ cls.pattern }}** — {{ cls.pattern_evidence | join(" ; ") }}
@@ -42,6 +53,12 @@
 
 {% for method in cls.methods %}
 - `{{ method.name }}{{ method.signature }}`{% if method.summary %} — {{ method.summary }}{% endif +%}
+{% if method.callers %}
+    - {{ t.callers }} : {% for entry in method.callers %}[`{{ entry.qualname }}`]({{ entry.href }}){% if not entry.certain %} *({{ t.uncertain }})*{% endif %}{% if not loop.last %}, {% endif %}{% endfor +%}
+{% endif %}
+{% if method.callees %}
+    - {{ t.callees }} : {% for entry in method.callees %}[`{{ entry.qualname }}`]({{ entry.href }}){% if not entry.certain %} *({{ t.uncertain }})*{% endif %}{% if not loop.last %}, {% endif %}{% endfor +%}
+{% endif %}
 {% endfor %}
 {% endif %}
 {% endfor %}
@@ -51,6 +68,34 @@
 ## {{ t.functions }}
 
 {% for fn in functions %}
+{% if explorer %}
+### `{{ fn.name }}`
+
+`{{ fn.name }}{{ fn.signature }}`{% if fn.summary %} — {{ fn.summary }}{% endif +%}
+{% if fn.callers %}
+
+- {{ t.callers }} : {% for entry in fn.callers %}[`{{ entry.qualname }}`]({{ entry.href }}){% if not entry.certain %} *({{ t.uncertain }})*{% endif %}{% if not loop.last %}, {% endif %}{% endfor +%}
+{% endif %}
+{% if fn.callees %}
+{% if not fn.callers %}
+
+{% endif %}
+- {{ t.callees }} : {% for entry in fn.callees %}[`{{ entry.qualname }}`]({{ entry.href }}){% if not entry.certain %} *({{ t.uncertain }})*{% endif %}{% if not loop.last %}, {% endif %}{% endfor +%}
+{% endif %}
+{% if fn.excerpt %}
+
+??? note "{{ t.source }} : `{{ fn.excerpt.path }}:{{ fn.excerpt.start_line }}-{{ fn.excerpt.end_line }}`"
+
+    ```{{ lang }}
+{{ fn.excerpt.code | indent(4, true) }}
+    ```
+{% elif fn.source_missing %}
+
+*{{ t.source_unavailable }}*
+{% endif %}
+
+{% else %}
 - `{{ fn.name }}{{ fn.signature }}`{% if fn.summary %} — {{ fn.summary }}{% endif +%}
+{% endif %}
 {% endfor %}
 {% endif %}

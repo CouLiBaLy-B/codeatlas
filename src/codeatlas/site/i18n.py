@@ -66,6 +66,29 @@ LABELS: dict[str, dict[str, str]] = {
             "Suggested onboarding order — entry points first, then layers from "
             "presentation down to infrastructure."
         ),
+        "layer": "Layer",
+        "all": "all",
+        "expand": "Expand",
+        "collapse": "Collapse",
+        "open_page": "Open page",
+        "deps_in": "Incoming dependencies",
+        "deps_out": "Outgoing dependencies",
+        "complexity": "Complexity",
+        "fan_in": "Fan-in",
+        "fan_out": "Fan-out",
+        "modules_count": "Modules",
+        "explorer_hint": (
+            "Click: details — double-click: expand — filters are encoded in the URL."
+        ),
+        "treemap": "Proportional map",
+        "treemap_note": (
+            "Each tile is a module sized by the selected metric; click a tile to open "
+            "its page."
+        ),
+        "callers": "Callers",
+        "callees": "Callees",
+        "uncertain": "uncertain",
+        "source_unavailable": "Source unavailable.",
     },
     "fr": {
         "overview": "Vue d'ensemble",
@@ -130,6 +153,29 @@ LABELS: dict[str, dict[str, str]] = {
             "Ordre de lecture suggéré pour l'onboarding — points d'entrée d'abord, "
             "puis les couches de la présentation vers l'infrastructure."
         ),
+        "layer": "Couche",
+        "all": "tous",
+        "expand": "Déplier",
+        "collapse": "Replier",
+        "open_page": "Ouvrir la page",
+        "deps_in": "Dépendances entrantes",
+        "deps_out": "Dépendances sortantes",
+        "complexity": "Complexité",
+        "fan_in": "Fan-in",
+        "fan_out": "Fan-out",
+        "modules_count": "Modules",
+        "explorer_hint": (
+            "Clic : détails — double-clic : déplier — les filtres sont encodés dans l'URL."
+        ),
+        "treemap": "Carte proportionnelle",
+        "treemap_note": (
+            "Chaque tuile est un module dimensionné par la métrique choisie ; cliquer "
+            "une tuile ouvre sa page."
+        ),
+        "callers": "Appelants",
+        "callees": "Appelés",
+        "uncertain": "incertain",
+        "source_unavailable": "Source non disponible.",
     },
 }
 

@@ -94,6 +94,16 @@ class MonorepoCfg:
     roots: tuple[str, ...] = ()
 
 
+EXPLORER_METRICS = ("loc", "complexity", "doc_coverage", "fan_in", "fan_out")
+
+
+@dataclass(frozen=True, slots=True)
+class ExplorerCfg:
+    enabled: bool = True
+    include_source: bool = True
+    default_metric: str = "complexity"  # métrique initiale de la treemap
+
+
 @dataclass(frozen=True, slots=True)
 class Config:
     project: ProjectCfg = field(default_factory=ProjectCfg)
@@ -104,6 +114,7 @@ class Config:
     check: CheckCfg = field(default_factory=CheckCfg)
     export: ExportCfg = field(default_factory=ExportCfg)
     monorepo: MonorepoCfg = field(default_factory=MonorepoCfg)
+    explorer: ExplorerCfg = field(default_factory=ExplorerCfg)
 
 
 def _suggest(unknown: str, candidates: list[str]) -> str:
@@ -177,6 +188,11 @@ def _validate(config: Config) -> None:
         raise ConfigError("[check].max_doc_coverage_drop : points attendus (0-100) ou -1")
     if config.export.budget < 2000:
         raise ConfigError("[export].budget : minimum 2000 caractères")
+    if config.explorer.default_metric not in EXPLORER_METRICS:
+        raise ConfigError(
+            f"[explorer].default_metric : {config.explorer.default_metric!r} inconnu "
+            f"(choix : {', '.join(EXPLORER_METRICS)})"
+        )
 
 
 def _read_toml(path: Path) -> dict[str, Any]:

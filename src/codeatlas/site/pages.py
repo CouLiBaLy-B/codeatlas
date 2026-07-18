@@ -73,19 +73,104 @@ def _class_context(
     }
 
 
+def build_relations_index(graph: CodeGraph) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    """Appelants/appelés par symbole, précalculés UNE fois par build (performance).
+
+    Chaque entrée est cliquable (page + ancre) et conserve la certitude (FR-017).
+    """
+    from codeatlas.ir.model import EdgeKind
+
+    modules_desc = sorted(
+        (m.id for m in graph.iter_nodes(NodeKind.MODULE)), key=lambda i: -len(i)
+    )
+
+    def _href(node: Node) -> str:
+        owner = next((m for m in modules_desc if node.id.startswith(f"{m}.")), None)
+        if owner is None:
+            return ""
+        href = f"modules/{page_slug(graph, owner)}.md"
+        if node.kind in (NodeKind.CLASS, NodeKind.INTERFACE, NodeKind.ENUM, NodeKind.FUNCTION):
+            return f"{href}#{node.name.lower()}"
+        if node.kind is NodeKind.METHOD:
+            owner_class = node.id.rsplit(".", 2)[-2]
+            return f"{href}#{owner_class.lower()}"
+        return href
+
+    href_cache: dict[str, str] = {}
+    index: dict[str, dict[str, list[dict[str, Any]]]] = {}
+
+    def _entry(other_id: str, certain: bool) -> dict[str, Any] | None:
+        node = graph.get_node(other_id)
+        if node is None:
+            return None
+        if other_id not in href_cache:
+            href_cache[other_id] = _href(node)
+        return {
+            "qualname": _qualname(other_id),
+            "href": href_cache[other_id],
+            "certain": certain,
+        }
+
+    for edge in graph.edges_of_kind(EdgeKind.CALLS):
+        certain = edge.certainty.value == "certain"
+        caller_entry = _entry(edge.source, certain)
+        callee_entry = _entry(edge.target, certain)
+        if callee_entry is not None:
+            slot = index.setdefault(edge.source, {"callers": [], "callees": []})
+            slot["callees"].append(callee_entry)
+        if caller_entry is not None:
+            slot = index.setdefault(edge.target, {"callers": [], "callees": []})
+            slot["callers"].append(caller_entry)
+    for slots in index.values():
+        slots["callers"].sort(key=lambda entry: entry["qualname"])
+        slots["callees"].sort(key=lambda entry: entry["qualname"])
+    return index
+
+
 def render_module_page(
     graph: CodeGraph,
     module_id: str,
     config: Config,
     patterns: dict[str, PatternDetection] | None = None,
+    *,
+    explorer: bool = False,
+    source_root: Path | None = None,
+    relations: dict[str, dict[str, list[dict[str, Any]]]] | None = None,
 ) -> str:
-    """Page markdown d'un module : diagramme de classes + référence API."""
+    """Page markdown d'un module : diagramme, référence API, source et relations."""
     module = graph.get_node(module_id)
     if module is None or module.kind is not NodeKind.MODULE:
         raise ValueError(f"module inconnu : {module_id}")
     if patterns is None:
         patterns = {d.class_id: d for d in detect_patterns(graph)}
+    if explorer and relations is None:
+        relations = build_relations_index(graph)
+    no_relations: dict[str, list[dict[str, Any]]] = {"callers": [], "callees": []}
     translations = labels(config.project.language)
+
+    include_source = (
+        explorer and config.explorer.include_source and source_root is not None
+    )
+
+    def _excerpt(node: Node) -> dict[str, Any]:
+        """Contexte source d'un symbole : extrait exact ou mention explicite."""
+        if not include_source:
+            return {"excerpt": None, "source_missing": False}
+        from codeatlas.explorer.source import extract_excerpt
+
+        assert source_root is not None
+        excerpt = extract_excerpt(source_root, node)
+        if excerpt is None:
+            return {"excerpt": None, "source_missing": True}
+        return {
+            "excerpt": {
+                "path": excerpt.path,
+                "start_line": excerpt.start_line,
+                "end_line": excerpt.end_line,
+                "code": excerpt.code,
+            },
+            "source_missing": False,
+        }
 
     classes = [
         cls
@@ -98,6 +183,37 @@ def render_module_page(
         fn for fn in _children(graph, module_id, NodeKind.FUNCTION) if _visible(fn, config)
     ]
 
+    class_contexts = []
+    for cls in classes:
+        context = _class_context(graph, cls, config, patterns)
+        context.update(_excerpt(cls) if explorer else {"excerpt": None, "source_missing": False})
+        if explorer and relations is not None:
+            for method_context, method in zip(
+                context["methods"],
+                [m for m in _children(graph, cls.id, NodeKind.METHOD) if _visible(m, config)],
+                strict=False,
+            ):
+                method_context.update(relations.get(method.id, no_relations))
+        class_contexts.append(context)
+
+    function_contexts = []
+    for fn in sorted(functions, key=lambda f: f.name):
+        fn_context: dict[str, Any] = {
+            "name": fn.name,
+            "signature": fn.signature,
+            "summary": fn.doc.summary if fn.doc else "",
+            "callers": [],
+            "callees": [],
+            "excerpt": None,
+            "source_missing": False,
+        }
+        if explorer:
+            if relations is not None:
+                fn_context.update(relations.get(fn.id, no_relations))
+            fn_context.update(_excerpt(fn))
+        function_contexts.append(fn_context)
+
+    languages = {sub.id: sub.language for sub in graph.subprojects}
     qualname = module_id.split("/", 1)[1] if "/" in module_id else module_id
     diagram = (
         render_class_diagram(graph, module_id, config.analysis.include_private)
@@ -106,17 +222,12 @@ def render_module_page(
     )
     rendered = _environment().get_template("module.md.j2").render(
         t=translations,
+        explorer=explorer,
+        lang=languages.get(module.subproject, ""),
         module={"qualname": qualname, "doc": module.doc.raw if module.doc else ""},
         class_diagram=diagram,
-        classes=[_class_context(graph, cls, config, patterns) for cls in classes],
-        functions=[
-            {
-                "name": fn.name,
-                "signature": fn.signature,
-                "summary": fn.doc.summary if fn.doc else "",
-            }
-            for fn in sorted(functions, key=lambda f: f.name)
-        ],
+        classes=class_contexts,
+        functions=function_contexts,
     )
     return rendered.rstrip("\n") + "\n"
 
@@ -178,12 +289,22 @@ def module_display_name(graph: CodeGraph, module_id: str) -> str:
     return _qualname(module_id)
 
 
-def render_health_page(graph: CodeGraph, config: Config) -> str:
-    """Page « Santé du code » : métriques par module, pires fonctions, code mort."""
+def render_health_page(
+    graph: CodeGraph, config: Config, dashboard: dict[str, Any] | None = None
+) -> str:
+    """Page « Santé du code » : métriques par module, treemap, code mort, ignorés."""
     health = compute_metrics(graph, config)
     dead = find_dead_code(graph)
+    treemap_svg = ""
+    if dashboard is not None:
+        from codeatlas.explorer.dashboard import render_treemap_svg
+
+        subproject_of = {row["id"]: row["subproject"] for row in dashboard["rows"]}
+        treemap_svg = render_treemap_svg(dashboard["treemap"], subproject_of)
     rendered = _environment().get_template("health.md.j2").render(
         t=labels(config.project.language),
+        treemap_svg=treemap_svg,
+        skipped=[{"path": s.path, "reason": s.reason} for s in graph.skipped],
         global_doc_coverage=health.global_doc_coverage,
         modules=[
             {
@@ -218,11 +339,43 @@ def render_health_page(graph: CodeGraph, config: Config) -> str:
     return rendered.rstrip("\n") + "\n"
 
 
-def render_architecture_page(graph: CodeGraph, config: Config) -> str | None:
-    """Page « Architecture » : couches, violations, patterns ; None si rien à montrer."""
+def _explorer_labels_json(translations: dict[str, str]) -> str:
+    """Libellés passés au JS de l'explorateur — JSON canonique (déterminisme)."""
+    from codeatlas.explorer.emit import canonical_json
+
+    return canonical_json(
+        {
+            "language": translations["language"],
+            "layer": translations["layer"],
+            "subproject": translations["subproject"],
+            "all": translations["all"],
+            "hint": translations["explorer_hint"],
+            "expand": translations["expand"],
+            "collapse": translations["collapse"],
+            "open_page": translations["open_page"],
+            "deps_in": translations["deps_in"],
+            "deps_out": translations["deps_out"],
+            "loc": translations["loc"],
+            "complexity": translations["complexity"],
+            "doc_coverage": translations["doc_coverage"],
+            "fan_in": translations["fan_in"],
+            "fan_out": translations["fan_out"],
+            "modules": translations["modules_count"],
+        }
+    )
+
+
+def render_architecture_page(
+    graph: CodeGraph, config: Config, explorer: bool = False
+) -> str | None:
+    """Page « Architecture » : explorateur (si activé), couches, violations, patterns.
+
+    Sans explorateur, None si rien à montrer (comportement historique) ; avec
+    explorateur, la page existe toujours — le contenu statique reste le repli FR-005.
+    """
     report = compute_architecture(graph)
     patterns = detect_patterns(graph)
-    if not report.layers and not patterns:
+    if not explorer and not report.layers and not patterns:
         return None
     pattern_contexts = []
     for detection in patterns:
@@ -235,9 +388,12 @@ def render_architecture_page(graph: CodeGraph, config: Config) -> str | None:
                 "evidence": list(detection.evidence),
             }
         )
+    translations = labels(config.project.language)
     rendered = _environment().get_template("architecture.md.j2").render(
-        t=labels(config.project.language),
-        diagram=render_architecture(graph, report),
+        t=translations,
+        explorer_labels=_explorer_labels_json(translations) if explorer else "",
+        diagram=render_architecture(graph, report) if report.layers else "",
+        fallback_diagram=render_package_deps(graph) if not report.layers else "",
         violations=[
             {
                 "source": v.source_package,
