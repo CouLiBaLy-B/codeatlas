@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover
     from codeatlas.baseline.capture import Baseline
@@ -65,12 +65,70 @@ def _reroot_fragment(fragment: object, prefix: str) -> None:
     ]
 
 
-def _analyze_single(root: Path, cfg: Config, graph: CodeGraph) -> bool:
-    """Dépôt simple : tous les analyseurs disponibles sur la racine."""
-    options = AnalyzerOptions(include_private=cfg.analysis.include_private)
-    analyzed_any = False
+@dataclass(frozen=True, slots=True)
+class AnalysisUnit:
+    """Unité d'analyse : un sous-projet + ses fichiers découverts.
+
+    C'est la granularité de la régénération incrémentale du mode atelier
+    (feature 004) : re-analyser une unité et réutiliser les fragments des autres
+    produit exactement le même graphe qu'une analyse complète.
+    """
+
+    subproject: SubProject
+    language: str
+    files: tuple[Any, ...]  # SourceFile — contenu lu à la découverte
+    unreadable: tuple[Any, ...]  # SkippedFile déjà préfixés au dépôt
+    prefix: str  # re-préfixage des chemins ("" si aucun)
+
+
+def _discover_units(root: Path, cfg: Config) -> tuple[list[SubProject], list[AnalysisUnit]]:
+    """Sous-projets déclarés + unités analysables (découverte sans analyse)."""
+    from codeatlas.ir.model import SkippedFile
+    from codeatlas.monorepo.detect import detect_subprojects
+
+    analyzers = available_analyzers()
+    subs = (
+        detect_subprojects(root, cfg.analysis.exclude, roots=tuple(cfg.monorepo.roots))
+        if cfg.monorepo.detect
+        else []
+    )
+    units: list[AnalysisUnit] = []
+    if len(subs) > 1:
+        for sub in subs:
+            if cfg.analysis.languages and sub.language not in cfg.analysis.languages:
+                continue  # filtre [analysis].languages (FR-017, T087)
+            analyzer = analyzers.get(sub.language)
+            if analyzer is None:
+                continue  # langage non supporté : listé, jamais bloquant (US6 scénario 3)
+            sub_dir = root if sub.root == "." else root / sub.root
+            files, unreadable = discover_files(
+                sub_dir, cfg.analysis.exclude, analyzer.extensions
+            )
+            nested = [
+                other.root
+                for other in subs
+                if other.root != sub.root
+                and (sub.root == "." or other.root.startswith(f"{sub.root}/"))
+            ]
+            kept = []
+            for source in files:
+                full = source.path if sub.root == "." else f"{sub.root}/{source.path}"
+                if any(full == n or full.startswith(f"{n}/") for n in nested):
+                    continue
+                kept.append(source)
+            prefix = "" if sub.root in ("", ".") else sub.root
+            prefixed = tuple(
+                SkippedFile(
+                    path=f"{prefix}/{s.path}" if prefix else s.path, reason=s.reason
+                )
+                for s in unreadable
+            )
+            units.append(AnalysisUnit(sub, sub.language, tuple(kept), prefixed, prefix))
+        return subs, units
+
+    single_subs: list[SubProject] = []
     main_taken = False
-    for language, analyzer in available_analyzers().items():
+    for language, analyzer in analyzers.items():
         if cfg.analysis.languages and language not in cfg.analysis.languages:
             continue
         files, unreadable = discover_files(root, cfg.analysis.exclude, analyzer.extensions)
@@ -79,78 +137,63 @@ def _analyze_single(root: Path, cfg: Config, graph: CodeGraph) -> bool:
         sub_id = "main" if not main_taken else f"main-{language}"
         main_taken = True
         subproject = SubProject(id=sub_id, language=language, root=".")
-        graph.add_subproject(subproject)
-        fragment = analyzer.analyze(files, subproject, options)
-        for node in fragment.nodes:
-            graph.add_node(node)
-        for edge in fragment.edges:
-            graph.add_edge(edge)
-        for skipped in (*unreadable, *fragment.skipped):
-            graph.add_skipped(skipped)
-        analyzed_any = analyzed_any or bool(fragment.nodes)
-    return analyzed_any
+        single_subs.append(subproject)
+        units.append(AnalysisUnit(subproject, language, tuple(files), tuple(unreadable), ""))
+    return single_subs, units
 
 
-def _analyze_monorepo(root: Path, cfg: Config, graph: CodeGraph, subs: list[SubProject]) -> bool:
-    """Monorepo : chaque sous-projet analysé par l'analyseur de son langage."""
+def _analyze_unit(unit: AnalysisUnit, cfg: Config) -> Any:
+    """Analyse une unité → IRFragment re-préfixé (pur vis-à-vis du reste du dépôt)."""
+    options = AnalyzerOptions(include_private=cfg.analysis.include_private)
+    analyzer = available_analyzers()[unit.language]
+    fragment = analyzer.analyze(list(unit.files), unit.subproject, options)
+    if unit.prefix:
+        _reroot_fragment(fragment, unit.prefix)
+    return fragment
+
+
+def _assemble_graph(
+    root_name: str,
+    subs: list[SubProject],
+    results: list[tuple[AnalysisUnit, Any]],
+) -> tuple[CodeGraph, bool]:
+    """Fusionne les fragments en un CodeGraph + liens inter-services (monorepo)."""
     from codeatlas.ir.model import Edge, EdgeKind
 
-    options = AnalyzerOptions(include_private=cfg.analysis.include_private)
-    analyzers = available_analyzers()
-    analyzed_any = False
+    graph = CodeGraph(root=root_name)
     for sub in subs:
         graph.add_subproject(sub)
-    for sub in subs:
-        if cfg.analysis.languages and sub.language not in cfg.analysis.languages:
-            continue  # filtre [analysis].languages (FR-017, T087)
-        analyzer = analyzers.get(sub.language)
-        if analyzer is None:
-            continue  # langage non supporté : listé, jamais bloquant (US6 scénario 3)
-        sub_dir = root if sub.root == "." else root / sub.root
-        files, unreadable = discover_files(sub_dir, cfg.analysis.exclude, analyzer.extensions)
-        nested = [
-            other.root
-            for other in subs
-            if other.root != sub.root
-            and (sub.root == "." or other.root.startswith(f"{sub.root}/"))
-        ]
-        kept = []
-        for source in files:
-            full = source.path if sub.root == "." else f"{sub.root}/{source.path}"
-            if any(full == n or full.startswith(f"{n}/") for n in nested):
-                continue
-            kept.append(source)
-        fragment = analyzer.analyze(kept, sub, options)
-        _reroot_fragment(fragment, sub.root)
+    analyzed_any = False
+    for unit, fragment in results:
         for node in fragment.nodes:
             graph.add_node(node)
         for edge in fragment.edges:
             graph.add_edge(edge)
-        prefix = "" if sub.root == "." else f"{sub.root}/"
-        for skipped in fragment.skipped:
+        for skipped in (*unit.unreadable, *fragment.skipped):
             graph.add_skipped(skipped)
-        for skipped in unreadable:
-            graph.add_skipped(
-                type(skipped)(path=f"{prefix}{skipped.path}", reason=skipped.reason)
-            )
         analyzed_any = analyzed_any or bool(fragment.nodes)
-    for sub in subs:
-        for dep_id in sub.declared_deps:
-            graph.add_edge(Edge(source=sub.id, target=dep_id, kind=EdgeKind.SERVICE_DEP))
-    # imports croisés détectés dans les sources (T085) : ext-import:<nom de package>
-    name_to_id = {sub.name: sub.id for sub in subs if sub.name}
-    for module in graph.iter_nodes():
-        if module.kind.value != "module":
-            continue
-        for modifier in sorted(module.modifiers):
-            if not modifier.startswith("ext-import:"):
+    if len(subs) > 1:
+        for sub in subs:
+            for dep_id in sub.declared_deps:
+                graph.add_edge(Edge(source=sub.id, target=dep_id, kind=EdgeKind.SERVICE_DEP))
+        # imports croisés détectés dans les sources (T085) : ext-import:<nom de package>
+        name_to_id = {sub.name: sub.id for sub in subs if sub.name}
+        for module in graph.iter_nodes():
+            if module.kind.value != "module":
                 continue
-            target_id = name_to_id.get(modifier.removeprefix("ext-import:"))
-            if target_id is not None and target_id != module.subproject:
-                graph.add_edge(
-                    Edge(source=module.subproject, target=target_id, kind=EdgeKind.SERVICE_DEP)
-                )
-    return analyzed_any
+            for modifier in sorted(module.modifiers):
+                if not modifier.startswith("ext-import:"):
+                    continue
+                target_id = name_to_id.get(modifier.removeprefix("ext-import:"))
+                if target_id is not None and target_id != module.subproject:
+                    graph.add_edge(
+                        Edge(
+                            source=module.subproject,
+                            target=target_id,
+                            kind=EdgeKind.SERVICE_DEP,
+                        )
+                    )
+    return graph, analyzed_any
 
 
 def analyze(path: Path, config: Config | None = None) -> CodeGraph:
@@ -159,23 +202,14 @@ def analyze(path: Path, config: Config | None = None) -> CodeGraph:
     Tolérante : les fichiers non parsables deviennent des entrées `skipped`.
     Lève CodeAtlasError seulement si RIEN n'est analysable (constitution IV).
     """
-    from codeatlas.monorepo.detect import detect_subprojects
-
     root = path.resolve()
     if not root.is_dir():
         raise CodeAtlasError(f"répertoire introuvable : {path}")
     cfg = config if config is not None else load_config(root)
 
-    graph = CodeGraph(root=root.name)
-    subs = (
-        detect_subprojects(root, cfg.analysis.exclude, roots=tuple(cfg.monorepo.roots))
-        if cfg.monorepo.detect
-        else []
-    )
-    if len(subs) > 1:
-        analyzed_any = _analyze_monorepo(root, cfg, graph, subs)
-    else:
-        analyzed_any = _analyze_single(root, cfg, graph)
+    subs, units = _discover_units(root, cfg)
+    results = [(unit, _analyze_unit(unit, cfg)) for unit in units]
+    graph, analyzed_any = _assemble_graph(root.name, subs, results)
 
     if not analyzed_any:
         raise CodeAtlasError(
@@ -291,6 +325,100 @@ def compute_impact(
         )
         targets = (node_id,)
     return _compute(graph, targets, depth)
+
+
+def build_explorer_data(graph: CodeGraph, config: Config | None = None) -> Any:
+    """Données des vues interactives (feature 004) — pur et déterministe.
+
+    Retourne un `codeatlas.explorer.emit.ExplorerData` prêt à émettre via
+    `write_data` ; ne consomme que l'IR et les insights (constitution III).
+    """
+    from codeatlas.explorer.dashboard import build_dashboard
+    from codeatlas.explorer.emit import ExplorerData
+    from codeatlas.explorer.graphview import build_graph_view
+    from codeatlas.explorer.search import build_search_index
+    from codeatlas.site.pages import page_slug
+
+    cfg = config if config is not None else Config()
+
+    def page_for(module_id: str) -> str:
+        return f"modules/{page_slug(graph, module_id)}.html"
+
+    return ExplorerData(
+        graph=build_graph_view(graph, cfg, page_for),
+        search=build_search_index(graph, cfg, page_for),
+        dashboard=build_dashboard(graph, cfg, page_for),
+    )
+
+
+def serve_docs(
+    path: Path,
+    config: Config | None = None,
+    *,
+    port: int = 8321,
+    watch: bool = True,
+    open_browser: bool = False,
+    on_event: Any = None,
+    workdir: Path | None = None,
+) -> Any:
+    """Mode atelier (feature 004) : build, service local et régénération continue.
+
+    Retourne la `WorkshopSession` démarrée (serveur sur 127.0.0.1:`port`, watcher
+    si `watch`). Lève `PortInUseError` si le port est occupé. `session.stop()`
+    arrête proprement. Le serveur n'écoute QUE sur l'interface locale (FR-012).
+    """
+    import threading
+    import time as _time
+
+    from codeatlas.serve.server import create_server, serve_in_thread
+    from codeatlas.serve.session import DEBOUNCE_SECONDS, WorkshopSession
+    from codeatlas.serve.watcher import FileWatcher
+
+    root = Path(path).resolve()
+    if not root.is_dir():
+        raise CodeAtlasError(f"répertoire introuvable : {path}")
+    cfg = config if config is not None else load_config(root)
+    if not cfg.site.enabled:
+        from dataclasses import replace
+
+        cfg = replace(cfg, site=replace(cfg.site, enabled=True))  # servir exige le HTML
+
+    session = WorkshopSession(root, cfg, workdir=workdir, on_event=on_event)
+    if not session.build():
+        raise CodeAtlasError(f"aucun fichier analysable trouvé dans {path}")
+    if not session.site_dir.is_dir():
+        raise CodeAtlasError(
+            "site HTML indisponible — installez l'extra site : "
+            'pip install "codeatlas-doc[site]"'
+        )
+    server = create_server(session.site_dir, lambda: str(session.build_token), port=port)
+    session.server = server
+    session.threads.append(serve_in_thread(server))
+
+    if watch:
+        watcher = FileWatcher(root, session.notify_change)
+        watcher.start()
+        session.watcher = watcher
+
+        def _debounce_worker() -> None:
+            while not session.stopped:
+                session.wakeup.wait(timeout=0.5)
+                if session.stopped:
+                    return
+                if session.wakeup.is_set():
+                    _time.sleep(DEBOUNCE_SECONDS)  # regroupe les rafales de sauvegardes
+                    session.flush()
+
+        worker = threading.Thread(target=_debounce_worker, daemon=True)
+        worker.start()
+        session.threads.append(worker)
+
+    if open_browser:  # pragma: no cover — geste de confort local
+        import webbrowser
+
+        actual_port = server.server_address[1]
+        webbrowser.open(f"http://127.0.0.1:{actual_port}/")
+    return session
 
 
 def capture_baseline(graph: CodeGraph, config: Config | None = None) -> Baseline:

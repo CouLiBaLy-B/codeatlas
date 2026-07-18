@@ -2,6 +2,14 @@
 
 **{{ t.global_doc_coverage }} : {{ global_doc_coverage }} %**
 
+{% if treemap_svg %}
+## {{ t.treemap }}
+
+{{ t.treemap_note }}
+
+{{ treemap_svg }}
+
+{% endif %}
 | {{ t.module }} | {{ t.loc }} | {{ t.max_complexity }} | {{ t.doc_coverage }} | {{ t.coupling }} | {{ t.status }} |
 | --- | --- | --- | --- | --- | --- |
 {% for row in modules %}
@@ -26,4 +34,14 @@
 {% endfor %}
 {% else %}
 {{ t.no_dead_code }}
+{% endif %}
+{% if skipped %}
+
+## {{ t.skipped }}
+
+| {{ t.source }} | {{ t.skipped_reason }} |
+| --- | --- |
+{% for entry in skipped %}
+| `{{ entry.path }}` | {{ entry.reason }} |
+{% endfor %}
 {% endif %}

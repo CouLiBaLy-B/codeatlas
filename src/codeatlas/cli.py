@@ -23,6 +23,7 @@ EXIT_OK = 0
 EXIT_FATAL = 1
 EXIT_USAGE = 2
 EXIT_CHECK_FAILED = 3
+EXIT_PORT_BUSY = 4
 
 _stderr = Console(stderr=True)
 
@@ -86,6 +87,12 @@ def main() -> None:
 @click.option("--include-private", is_flag=True, help="Inclut les symboles privés.")
 @click.option("--depth", type=int, default=None, help="Profondeur des graphes d'appels.")
 @click.option("--site/--no-site", "with_site", default=True)
+@click.option(
+    "--explorer/--no-explorer",
+    "with_explorer",
+    default=None,
+    help="Vues interactives du site (explorateur, recherche, tableau de bord).",
+)
 @click.option("--svg", is_flag=True, help="Exporte aussi les diagrammes en SVG.")
 @click.option("--json-report", type=click.Path(path_type=Path), default=None)
 @click.option("--quiet", is_flag=True)
@@ -98,6 +105,7 @@ def build(
     include_private: bool,
     depth: int | None,
     with_site: bool,
+    with_explorer: bool | None,
     svg: bool,
     json_report: Path | None,
     quiet: bool,
@@ -123,6 +131,8 @@ def build(
         config,
         site=replace(config.site, enabled=with_site, svg_export=svg or config.site.svg_export),
     )
+    if with_explorer is not None:
+        config = replace(config, explorer=replace(config.explorer, enabled=with_explorer))
 
     started = time.monotonic()
     try:
@@ -465,6 +475,77 @@ def impact(
             click.echo(f"  • {entry.id} [via {entry.via}]{marker}")
     if report.entrypoints_reached:
         click.echo("Points d'entrée atteints : " + ", ".join(report.entrypoints_reached))
+    sys.exit(EXIT_OK)
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option("--port", type=int, default=8321, show_default=True, help="Port local d'écoute.")
+@click.option("--open", "open_browser", is_flag=True, help="Ouvre le navigateur au démarrage.")
+@click.option("--watch/--no-watch", default=True, help="Régénère à chaque modification.")
+@click.option("--json", "as_json", is_flag=True, help="Événements en JSON Lines sur stdout.")
+@click.option("--config", "-c", "config_file", type=click.Path(path_type=Path), default=None)
+def serve(
+    path: Path,
+    port: int,
+    open_browser: bool,
+    watch: bool,
+    as_json: bool,
+    config_file: Path | None,
+) -> None:
+    """Mode atelier : sert la documentation et la régénère au fil des modifications."""
+    import json as _json
+
+    from codeatlas.serve.server import PortInUseError
+
+    config = _load_config_or_exit(path, config_file)
+
+    def on_event(event: dict[str, object]) -> None:
+        if as_json:
+            click.echo(_json.dumps(event, ensure_ascii=False, sort_keys=True))
+        elif event["event"] == "warning":
+            _stderr.print(f"[yellow]avertissement :[/yellow] {event['path']} — {event['reason']}")
+        else:
+            _stderr.print(
+                f"[green]{event['event']}[/green] ({event['trigger']}) : "
+                f"{event['elements']} éléments, {event['warnings']} avertissement(s), "
+                f"{event['duration_ms']} ms"
+            )
+
+    try:
+        session = api.serve_docs(
+            path,
+            config,
+            port=port,
+            watch=watch,
+            open_browser=open_browser,
+            on_event=on_event,
+        )
+    except PortInUseError as exc:
+        _stderr.print(f"[red]erreur :[/red] {exc}")
+        sys.exit(EXIT_PORT_BUSY)
+    except api.CodeAtlasError as exc:
+        _stderr.print(f"[red]erreur :[/red] {exc}")
+        sys.exit(EXIT_FATAL)
+
+    actual_port = session.server.server_address[1]
+    _stderr.print(
+        f"[green]Atelier ouvert sur[/green] http://127.0.0.1:{actual_port}/ "
+        "(Ctrl-C pour arrêter)"
+    )
+    import signal
+
+    def _terminate(signum: int, frame: object) -> None:
+        raise KeyboardInterrupt  # SIGTERM (conteneur, kill) = arrêt propre aussi
+
+    signal.signal(signal.SIGTERM, _terminate)
+    try:
+        while True:
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        session.stop()
     sys.exit(EXIT_OK)
 
 

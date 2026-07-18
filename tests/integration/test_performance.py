@@ -102,6 +102,44 @@ def test_baseline_diff_gate_under_10_seconds(tmp_path: Path) -> None:
 
 
 @pytest.mark.slow
+def test_explorer_overhead_stays_bounded(tmp_path: Path) -> None:
+    """SC-005 (feature 004) : les vues interactives ne renchérissent pas le build.
+
+    Cible spec : ≤ +20 % (mesuré : +7 % — le lexing Pygments des extraits, qui
+    multipliait le build par ~3,8, est désactivé). Seuil de garde CI : 1.35 pour
+    absorber le bruit de mesure tout en attrapant toute régression de cette classe.
+    """
+    corpus = tmp_path / "bigrepo"
+    _generate_corpus(corpus)
+    runner = CliRunner()
+
+    started = time.monotonic()
+    assert (
+        runner.invoke(
+            main,
+            ["build", str(corpus), "--out", str(tmp_path / "off"), "--no-explorer", "--quiet"],
+        ).exit_code
+        == 0
+    )
+    baseline = time.monotonic() - started
+
+    started = time.monotonic()
+    assert (
+        runner.invoke(
+            main, ["build", str(corpus), "--out", str(tmp_path / "on"), "--quiet"]
+        ).exit_code
+        == 0
+    )
+    with_explorer = time.monotonic() - started
+
+    ratio = with_explorer / baseline
+    assert ratio < 1.35, (
+        f"explorer x{ratio:.2f} vs --no-explorer "
+        f"({with_explorer:.1f}s / {baseline:.1f}s) — SC-005 (cible ≤ 1.20)"
+    )
+
+
+@pytest.mark.slow
 def test_50k_lines_documented_under_30_seconds(tmp_path: Path) -> None:
     corpus = tmp_path / "bigrepo"
     lines = _generate_corpus(corpus)

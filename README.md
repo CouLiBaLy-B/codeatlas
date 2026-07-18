@@ -37,6 +37,33 @@ Chaque affirmation est traçable : les liens d'appel incertains (réflexion, `ge
 sont **en pointillés**, jamais présentés comme sûrs ; chaque détection porte ses
 indices.
 
+## Explorer la documentation
+
+Le site généré n'est pas seulement lisible, il est **explorable** — toujours
+hors-ligne, y compris ouvert en `file://` :
+
+- **Explorateur d'architecture** (page Architecture) : le graphe de code en vue
+  zoomable par niveaux (sous-projets → packages → modules), fiche au clic,
+  filtres par langage/couche/sous-projet encodés dans l'URL (partageables).
+  Sans JavaScript, les diagrammes statiques restent le repli.
+- **Recherche de symboles** (touche `s` sur toute page) : modules, classes,
+  fonctions et méthodes avec signatures — classement déterministe, jamais de
+  résultat inventé.
+- **Tableau de bord** (page Santé) : tables triables au clic, carte
+  proportionnelle SVG cliquable (le module le plus préoccupant saute aux yeux),
+  fichiers ignorés listés avec leur motif.
+- **Fiches enrichies** : extrait de source exact de chaque symbole (repliable),
+  appelants/appelés cliquables, liens incertains distingués. `[explorer]
+  include_source = false` pour exclure les extraits.
+- **Mode atelier** : `codeatlas serve PATH` sert la documentation sur
+  `127.0.0.1` et la régénère à chaque sauvegarde (analyse incrémentale par
+  sous-projet, rechargement automatique du navigateur). Un fichier cassé ne tue
+  jamais la session : il est signalé et le reste du site continue d'être servi.
+
+`--no-explorer` (ou `[explorer] enabled = false`) restitue le site strictement
+statique. Les vues interactives sont vendorisées (Cytoscape.js, empreinte
+SHA-256 vérifiée par test) : **aucun CDN, aucune requête externe**.
+
 ## Garanties
 
 - **Déterministe** : deux exécutions → sorties identiques octet pour octet (testé en CI).
@@ -47,7 +74,8 @@ indices.
 ## Commandes
 
 ```bash
-codeatlas build PATH [--out DIR] [--no-site] [--include-private] [--json-report F]
+codeatlas build PATH [--out DIR] [--no-site] [--no-explorer] [--include-private]
+codeatlas serve PATH [--port 8321] [--open] [--no-watch] [--json]   # mode atelier
 codeatlas check PATH [--max-package-cycles N] [--min-doc-coverage PCT] \
                      [--max-critical-symbols N]        # mode CI : exit 3 si violation
 codeatlas diagram PATH --type calls --focus cli.main --depth 2   # diagramme focalisé
