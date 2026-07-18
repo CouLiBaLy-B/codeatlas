@@ -78,6 +78,16 @@ class TestCallersCallees:
         assert result.get("error")
         assert len(result.get("candidates", [])) >= 2
 
+    def test_depth_traverses_levels(self, graph: CodeGraph) -> None:
+        # contrat bridge.md : callers(symbol, depth) — niveaux distingués
+        shallow = tools.callers(graph, "InMemoryRepo.find", depth=1)
+        deep = tools.callers(graph, "InMemoryRepo.find", depth=2)
+        ids_shallow = {c["id"] for c in shallow["callers"]}
+        by_id = {c["id"]: c for c in deep["callers"]}
+        main_id = "main/shopdemo.cli.main"
+        assert main_id not in ids_shallow
+        assert by_id[main_id]["depth"] == 2
+
 
 class TestOverviewAndDeadCode:
     def test_overview_counts(self, graph: CodeGraph) -> None:

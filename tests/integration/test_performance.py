@@ -82,6 +82,26 @@ def _generate_corpus(root: Path, target_lines: int = 50_000) -> int:
 
 
 @pytest.mark.slow
+def test_baseline_diff_gate_under_10_seconds(tmp_path: Path) -> None:
+    """SC-003 (feature 002) : cycle baseline → diff → gate < 10 s sur ~50 k lignes."""
+    corpus = tmp_path / "bigrepo"
+    _generate_corpus(corpus)
+    runner = CliRunner()
+    assert runner.invoke(main, ["baseline", str(corpus)]).exit_code == 0
+
+    started = time.monotonic()
+    assert runner.invoke(main, ["diff", str(corpus)]).exit_code == 0
+    assert (
+        runner.invoke(
+            main, ["check", str(corpus), "--against-baseline", "--fail-on-new-cycles"]
+        ).exit_code
+        == 0
+    )
+    elapsed = time.monotonic() - started
+    assert elapsed < 10, f"diff + gate en {elapsed:.1f}s (> 10s) — SC-003 feature 002"
+
+
+@pytest.mark.slow
 def test_50k_lines_documented_under_30_seconds(tmp_path: Path) -> None:
     corpus = tmp_path / "bigrepo"
     lines = _generate_corpus(corpus)

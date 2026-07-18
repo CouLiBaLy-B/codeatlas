@@ -89,3 +89,9 @@
 ## Implementation Strategy
 
 MVP = Phases 1–4 (US1+US2, les deux P1) ; US3/US4 en incréments indépendants.
+
+---
+
+## Phase 8: Convergence
+
+- [x] T023 Benchmark baseline → diff → gate < 10 s sur ~50 k lignes (marqueur slow) dans tests/integration/test_performance.py per SC-003 (partial)

@@ -26,12 +26,19 @@ def mcp_available() -> bool:
 
 def build_server(path: Path, config: Config) -> FastMCP:
     """Analyse le dépôt puis construit le serveur et ses outils."""
+    from datetime import UTC, datetime
+
     from mcp.server.fastmcp import FastMCP
 
     from codeatlas import api
     from codeatlas.bridge import tools
 
-    state: dict[str, Any] = {"graph": api.analyze(path, config)}
+    def _now() -> str:
+        return datetime.now(tz=UTC).isoformat(timespec="seconds")
+
+    # horodatage de CHARGEMENT (réponse runtime du serveur, jamais un artefact —
+    # le déterminisme constitutionnel ne concerne que les sorties générées)
+    state: dict[str, Any] = {"graph": api.analyze(path, config), "analyzed_at": _now()}
 
     server = FastMCP(
         "codeatlas",
@@ -45,7 +52,14 @@ def build_server(path: Path, config: Config) -> FastMCP:
     @server.tool()
     def overview() -> dict[str, Any]:
         """Vue d'ensemble du dépôt : sous-projets, couches, points d'entrée, métriques."""
-        return tools.overview(state["graph"], config)
+        return {
+            **tools.overview(state["graph"], config),
+            "analyzed_at": state["analyzed_at"],
+            "freshness_note": (
+                "réponses issues de l'analyse chargée — utilisez `reload` "
+                "après une modification du code"
+            ),
+        }
 
     @server.tool()
     def search_symbol(query: str) -> dict[str, Any]:
@@ -58,14 +72,14 @@ def build_server(path: Path, config: Config) -> FastMCP:
         return tools.module_api(state["graph"], module)
 
     @server.tool()
-    def callers(symbol: str) -> dict[str, Any]:
-        """Qui appelle ce symbole (liens sûrs vs incertains distingués)."""
-        return tools.callers(state["graph"], symbol)
+    def callers(symbol: str, depth: int = 1) -> dict[str, Any]:
+        """Qui appelle ce symbole, jusqu'à `depth` niveaux (certitude distinguée)."""
+        return tools.callers(state["graph"], symbol, depth)
 
     @server.tool()
-    def callees(symbol: str) -> dict[str, Any]:
-        """Ce que ce symbole appelle (liens sûrs vs incertains distingués)."""
-        return tools.callees(state["graph"], symbol)
+    def callees(symbol: str, depth: int = 1) -> dict[str, Any]:
+        """Ce que ce symbole appelle, jusqu'à `depth` niveaux (certitude distinguée)."""
+        return tools.callees(state["graph"], symbol, depth)
 
     @server.tool()
     def impact(target: str, depth: int = 3) -> dict[str, Any]:
@@ -81,9 +95,11 @@ def build_server(path: Path, config: Config) -> FastMCP:
     def reload() -> dict[str, Any]:
         """Ré-analyse le dépôt (à utiliser après une modification du code)."""
         state["graph"] = api.analyze(path, config)
+        state["analyzed_at"] = _now()
         return {
             "modules": tools.overview(state["graph"], config)["modules"],
             "symbols": len(state["graph"].nodes),
+            "analyzed_at": state["analyzed_at"],
         }
 
     return server

@@ -118,31 +118,50 @@ def module_api(graph: CodeGraph, module: str) -> dict[str, Any]:
     }
 
 
-def _links(graph: CodeGraph, symbol: str, incoming: bool) -> dict[str, Any]:
+def _links(graph: CodeGraph, symbol: str, incoming: bool, depth: int) -> dict[str, Any]:
     node, error = _resolve_unique(
         graph, symbol, (NodeKind.FUNCTION, NodeKind.METHOD, NodeKind.CLASS, NodeKind.MODULE)
     )
     if node is None:
         assert error is not None
         return error
-    key = "callers" if incoming else "callees"
-    links = []
+    adjacency: dict[str, list[tuple[str, str]]] = {}
     for edge in graph.edges_of_kind(EdgeKind.CALLS):
-        if incoming and edge.target == node.id:
-            links.append({"id": edge.source, "certainty": edge.certainty.value})
-        elif not incoming and edge.source == node.id:
-            links.append({"id": edge.target, "certainty": edge.certainty.value})
-    return {"symbol": node.id, key: sorted(links, key=lambda item: item["id"])}
+        key_node, value_node = (
+            (edge.target, edge.source) if incoming else (edge.source, edge.target)
+        )
+        adjacency.setdefault(key_node, []).append((value_node, edge.certainty.value))
+
+    links: list[dict[str, Any]] = []
+    seen = {node.id}
+    frontier = {node.id}
+    for level in range(1, max(1, depth) + 1):
+        found: dict[str, str] = {}
+        for current in sorted(frontier):
+            for neighbor, certainty in sorted(adjacency.get(current, [])):
+                if neighbor not in seen and neighbor not in found:
+                    found[neighbor] = certainty
+        if not found:
+            break
+        links.extend(
+            {"id": neighbor, "certainty": found[neighbor], "depth": level}
+            for neighbor in sorted(found)
+        )
+        seen.update(found)
+        frontier = set(found)
+
+    key = "callers" if incoming else "callees"
+    return {"symbol": node.id, key: links}
 
 
-def callers(graph: CodeGraph, symbol: str) -> dict[str, Any]:
-    """Qui appelle ce symbole (certitude distinguée)."""
-    return _links(graph, symbol, incoming=True)
+def callers(graph: CodeGraph, symbol: str, depth: int = 1) -> dict[str, Any]:
+    """Qui appelle ce symbole, jusqu'à `depth` niveaux (certitude distinguée)."""
+    return _links(graph, symbol, incoming=True, depth=depth)
 
 
-def callees(graph: CodeGraph, symbol: str) -> dict[str, Any]:
-    """Ce que ce symbole appelle (certitude distinguée)."""
-    return _links(graph, symbol, incoming=False)
+def callees(graph: CodeGraph, symbol: str, depth: int = 1) -> dict[str, Any]:
+    """Ce que ce symbole appelle, jusqu'à `depth` niveaux (certitude distinguée)."""
+    return _links(graph, symbol, incoming=False, depth=depth)
 
 
 def impact(graph: CodeGraph, target: str, depth: int = 3) -> dict[str, Any]:

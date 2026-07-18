@@ -45,3 +45,12 @@
 ## Dependencies
 
 Setup → US1 → US3 (réutilise le graphe) → US2 (expose US1/US3) → US4 → Polish.
+
+---
+
+## Phase 7: Convergence
+
+- [x] T017 Implémenter le paramètre `depth` de `callers`/`callees` (traversée par niveaux, champ depth par lien) dans src/codeatlas/bridge/tools.py et server.py per contrat bridge.md (partial)
+- [x] T018 Test zéro-réseau couvrant export, impact et les outils MCP (socket bloquée) dans tests/integration/test_no_network.py per FR-005/SC-003 (partial)
+- [x] T019 Test exhaustif SC-001 : 100 % des symboles publics présents dans la carte au budget par défaut dans tests/unit/test_repomap.py per SC-001 (partial)
+- [x] T020 Exposer la fraîcheur d'analyse dans l'outil `overview` du serveur (horodatage capturé au chargement, rechargement via reload) dans src/codeatlas/bridge/server.py per spec edge case (partial)

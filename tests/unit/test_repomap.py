@@ -39,6 +39,29 @@ class TestContent:
         assert text.index("shopdemo.webapp") < text.index("shopdemo.storage.repo")
 
 
+class TestExhaustiveness:
+    def test_all_public_symbols_present_when_budget_allows(self, graph: CodeGraph) -> None:
+        """SC-001 : 100 % des APIs publiques figurent dans la carte (budget suffisant)."""
+        from codeatlas.ir.model import NodeKind, Visibility
+
+        text = build_repomap(graph, Config(), budget=100_000)
+        missing = [
+            node.name
+            for node in graph.iter_nodes()
+            if node.kind
+            in (
+                NodeKind.CLASS,
+                NodeKind.INTERFACE,
+                NodeKind.ENUM,
+                NodeKind.FUNCTION,
+                NodeKind.METHOD,
+            )
+            and node.visibility is Visibility.PUBLIC
+            and node.name not in text
+        ]
+        assert missing == []
+
+
 class TestBudget:
     def test_full_map_within_default_budget_no_omission(self, graph: CodeGraph) -> None:
         text = build_repomap(graph, Config())
