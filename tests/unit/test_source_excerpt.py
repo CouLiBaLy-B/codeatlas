@@ -90,7 +90,9 @@ def test_module_page_embeds_excerpt_and_callers(tmp_path: Path) -> None:
     assert "def target():" in page  # extrait exact
     assert "mod.py:4" in page
     assert "other.caller" in page  # appelant cliquable
-    assert "(modules/other.md#caller)" in page
+    # lien relatif NU vers la page sœur (jamais préfixé `modules/` : on est déjà dans modules/)
+    assert "(other.md#caller)" in page
+    assert "modules/other.md" not in page
     assert "incertain" in page or "uncertain" in page  # lien incertain distingué
 
 

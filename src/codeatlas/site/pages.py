@@ -85,10 +85,13 @@ def build_relations_index(graph: CodeGraph) -> dict[str, dict[str, list[dict[str
     )
 
     def _href(node: Node) -> str:
+        # Ces liens sont rendus SUR des pages de modules (docs/modules/<slug>.md) :
+        # la cible est une page sœur, donc chemin relatif nu, sans préfixe `modules/`
+        # (sinon mkdocs résout vers `modules/modules/<slug>.md`, lien cassé).
         owner = next((m for m in modules_desc if node.id.startswith(f"{m}.")), None)
         if owner is None:
             return ""
-        href = f"modules/{page_slug(graph, owner)}.md"
+        href = f"{page_slug(graph, owner)}.md"
         if node.kind in (NodeKind.CLASS, NodeKind.INTERFACE, NodeKind.ENUM, NodeKind.FUNCTION):
             return f"{href}#{node.name.lower()}"
         if node.kind is NodeKind.METHOD:

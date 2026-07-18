@@ -53,6 +53,25 @@ def test_two_builds_are_byte_for_byte_identical(runner, corpus: Path, tmp_path: 
     assert differences == []
 
 
+def test_module_pages_have_no_broken_self_relative_links(
+    runner, corpus: Path, tmp_path: Path
+) -> None:
+    """Régression : les liens appelants/appelés d'une page module sont des chemins
+    sœurs nus. Un préfixe `modules/` en trop donnerait `modules/modules/...`,
+    cassé (mkdocs le signale, l'utilisateur tombe sur une 404)."""
+    out = _build(runner, corpus, tmp_path / "docs")
+    module_pages = list((out / "docs" / "modules").glob("*.md"))
+    assert module_pages, "aucune page module générée"
+    linked = False
+    for page in module_pages:
+        text = page.read_text(encoding="utf-8")
+        # signature d'un lien cassé : une cible markdown préfixée `modules/`
+        assert "](modules/" not in text, f"{page.name} : lien préfixé modules/ (double-préfixe)"
+        if "](" in text and ".md#" in text:
+            linked = True
+    assert linked, "aucune page module ne porte de lien appelant/appelé — test inopérant"
+
+
 def test_no_explorer_produces_feature_001_site(runner, corpus: Path, tmp_path: Path) -> None:
     out = _build(runner, corpus, tmp_path / "docs", "--no-explorer")
     assets = out / "docs" / "assets"
