@@ -41,11 +41,20 @@ _INJECTION = b'<script src="' + RELOAD_ROUTE.encode("ascii") + b'"></script></bo
 
 
 class PortInUseError(CodeAtlasError):
-    """Le port demandé est déjà occupé (exit 4 côté CLI)."""
+    """Le port demandé est indisponible (exit 4 côté CLI)."""
 
     def __init__(self, port: int) -> None:
-        super().__init__(f"le port {port} est déjà utilisé — choisissez --port")
+        super().__init__(
+            f"le port {port} est déjà utilisé ou refusé par le système — choisissez --port"
+        )
         self.port = port
+
+
+def _is_port_unavailable(exc: OSError) -> bool:
+    """EADDRINUSE partout ; Windows signale aussi WSAEACCES (10013) sur un port tenu."""
+    if exc.errno in (errno.EADDRINUSE, errno.EACCES):
+        return True
+    return getattr(exc, "winerror", None) in (10013, 10048)
 
 
 def _make_handler(site_dir: Path, token_provider: Callable[[], str]) -> type:
@@ -93,7 +102,7 @@ def create_server(
     try:
         server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     except OSError as exc:
-        if exc.errno == errno.EADDRINUSE:
+        if _is_port_unavailable(exc):
             raise PortInUseError(port) from exc
         raise
     server.daemon_threads = True

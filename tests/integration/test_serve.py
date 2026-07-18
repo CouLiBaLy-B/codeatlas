@@ -84,6 +84,24 @@ def test_occupied_port_raises_and_cli_exits_4(workspace: Path, tmp_path: Path, r
         assert result.exit_code == 4
 
 
+def test_windows_socket_errors_map_to_port_in_use(tmp_path: Path, monkeypatch) -> None:
+    """WinError 10013/10048 (bind refusé sur port tenu) → PortInUseError (CI Windows)."""
+    import errno
+
+    from codeatlas.serve import server as server_module
+
+    for error in (
+        OSError(errno.EACCES, "forbidden"),
+        OSError(errno.EADDRINUSE, "in use"),
+    ):
+        def _refuse(*args: object, **kwargs: object) -> None:
+            raise error  # noqa: B023 — relevé immédiatement dans le with
+
+        monkeypatch.setattr(server_module, "ThreadingHTTPServer", _refuse)
+        with pytest.raises(PortInUseError):
+            server_module.create_server(tmp_path, lambda: "0", port=8321)
+
+
 def test_stop_frees_the_port(workspace: Path, tmp_path: Path) -> None:
     live = api.serve_docs(workspace, port=0, watch=False, workdir=tmp_path / "atelier")
     port = live.server.server_address[1]

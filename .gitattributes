@@ -1,0 +1,3 @@
+# Les JS vendorisés doivent rester octet pour octet identiques sur tous les OS :
+# leur empreinte SHA-256 est vérifiée par test (jamais de conversion CRLF au checkout).
+*.min.js binary
