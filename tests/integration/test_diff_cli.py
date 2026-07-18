@@ -25,6 +25,11 @@ def run(runner: CliRunner, *args: str):
     return runner.invoke(main, list(args))
 
 
+def plain(output: str) -> str:
+    """Neutralise le repli de ligne de Rich (largeur de console variable en CI)."""
+    return " ".join(output.split())
+
+
 def introduce_cycle(repo: Path) -> None:
     product = repo / "shopdemo" / "models" / "product.py"
     product.write_text(
@@ -47,7 +52,7 @@ class TestScenario1DiffVide:
         assert run(runner, "baseline", str(repo)).exit_code == 0
         result = run(runner, "diff", str(repo))
         assert result.exit_code == 0, result.output
-        assert "Aucun changement architectural" in result.output
+        assert "Aucun changement architectural" in plain(result.output)
 
 
 class TestScenario2CycleApparu:
@@ -84,7 +89,7 @@ class TestErreursUsage:
     def test_missing_baseline_exit_2(self, repo: Path, runner: CliRunner) -> None:
         result = run(runner, "diff", str(repo))
         assert result.exit_code == 2
-        assert "codeatlas baseline" in result.output
+        assert "codeatlas baseline" in plain(result.output)
 
     def test_incompatible_baseline_exit_2(self, repo: Path, runner: CliRunner) -> None:
         assert run(runner, "baseline", str(repo)).exit_code == 0
