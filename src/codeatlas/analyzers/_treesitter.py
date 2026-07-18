@@ -67,8 +67,9 @@ def doc_comment(statement: TSNode, doc_format: DocFormat) -> DocInfo | None:
 
 
 def line_of(node: TSNode) -> int:
-    return node.start_point[0] + 1
+    # int() explicite : sans les extras tree-sitter installés, mypy voit Any
+    return int(node.start_point[0]) + 1
 
 
 def loc_of(node: TSNode) -> int:
-    return node.end_point[0] - node.start_point[0] + 1
+    return int(node.end_point[0]) - int(node.start_point[0]) + 1

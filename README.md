@@ -14,10 +14,13 @@ LLM.**
 ## Une commande
 
 ```bash
-pip install "codeatlas[site]"
+pip install "codeatlas-doc[site]"
 codeatlas build ./mon-repo
 # → ouvrir codeatlas-docs/site/index.html (consultable sans réseau)
 ```
+
+> Le nom de distribution est `codeatlas-doc` (« codeatlas » était pris sur PyPI) ;
+> la commande et l'import restent `codeatlas`.
 
 ## Ce que contient la documentation générée
 
@@ -57,11 +60,11 @@ Configuration optionnelle via `codeatlas.toml` ou `[tool.codeatlas]`
 
 | Extra | Contenu |
 | --- | --- |
-| `codeatlas` | cœur + analyseur **Python** (ast natif) |
-| `codeatlas[site]` | site MkDocs Material |
-| `codeatlas[javascript]` | analyseur **JS/TS** (tree-sitter, wheels précompilées) |
-| `codeatlas[java]` | analyseur **Java** (tree-sitter) |
-| `codeatlas[all]` | tout |
+| `codeatlas-doc` | cœur + analyseur **Python** (ast natif) |
+| `codeatlas-doc[site]` | site MkDocs Material |
+| `codeatlas-doc[javascript]` | analyseur **JS/TS** (tree-sitter, wheels précompilées) |
+| `codeatlas-doc[java]` | analyseur **Java** (tree-sitter) |
+| `codeatlas-doc[all]` | tout |
 
 ## Intégration continue
 
