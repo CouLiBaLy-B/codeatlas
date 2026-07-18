@@ -54,3 +54,59 @@ def run_checks(graph: CodeGraph, thresholds: CheckCfg, config: Config) -> list[C
             )
 
     return sorted(results, key=lambda c: c.name)
+
+
+def evaluate_regressions(delta: object, thresholds: CheckCfg) -> list[CheckResult]:
+    """Règles de régression contre la baseline (feature 002) — opt-in.
+
+    Une catégorie déjà présente dans la baseline n'est jamais une régression :
+    seules les APPARITIONS (ou disparitions d'API) comptent.
+    """
+    from codeatlas.baseline.compare import ArchDelta
+
+    assert isinstance(delta, ArchDelta)
+    results: list[CheckResult] = []
+
+    def appeared(name: str) -> int:
+        category = delta.category(name)
+        return len(category.appeared) if category is not None else 0
+
+    def disappeared(name: str) -> int:
+        category = delta.category(name)
+        return len(category.disappeared) if category is not None else 0
+
+    rules: list[tuple[bool, str, int]] = [
+        (thresholds.fail_on_new_cycles, "fail-on-new-cycles", appeared("package_cycles")),
+        (
+            thresholds.fail_on_new_violations,
+            "fail-on-new-violations",
+            appeared("layer_violations"),
+        ),
+        (thresholds.fail_on_new_inferred, "fail-on-new-inferred", appeared("inferred_calls")),
+        (
+            thresholds.fail_on_removed_public_api,
+            "fail-on-removed-public-api",
+            disappeared("public_api"),
+        ),
+    ]
+    for enabled, name, actual in rules:
+        if enabled:
+            results.append(
+                CheckResult(name=name, threshold=0, actual=actual, passed=actual == 0)
+            )
+
+    if thresholds.max_doc_coverage_drop >= 0:
+        drop = 0
+        for metric in delta.metric_deltas:
+            if metric.name == "doc_coverage":
+                drop = max(0, metric.old - metric.new)
+        results.append(
+            CheckResult(
+                name="max-doc-coverage-drop",
+                threshold=thresholds.max_doc_coverage_drop,
+                actual=drop,
+                passed=drop <= thresholds.max_doc_coverage_drop,
+            )
+        )
+
+    return sorted(results, key=lambda c: c.name)

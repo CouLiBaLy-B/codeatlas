@@ -35,6 +35,43 @@ def _load_config_or_exit(path: Path, config_file: Path | None) -> Config:
         sys.exit(EXIT_USAGE)
 
 
+def _regression_results(
+    path: Path,
+    graph: object,
+    config: Config,
+    thresholds: object,
+    against_baseline: str,
+) -> list[object]:
+    """Règles de régression du gate : baseline absente → création + aucun échec."""
+    from codeatlas.baseline import store
+    from codeatlas.baseline.compare import compare
+    from codeatlas.config import CheckCfg
+    from codeatlas.insights.checks import evaluate_regressions
+    from codeatlas.ir.model import CodeGraph
+
+    assert isinstance(graph, CodeGraph)
+    assert isinstance(thresholds, CheckCfg)
+    reference_path = (
+        store.default_path(path.resolve())
+        if against_baseline == "__default__"
+        else Path(against_baseline)
+    )
+    captured = api.capture_baseline(graph, config)
+    if not reference_path.is_file():
+        store.write(captured, reference_path)
+        _stderr.print(
+            f"[yellow]baseline absente :[/yellow] créée dans {reference_path} — "
+            "premier lancement jamais bloquant"
+        )
+        return []
+    try:
+        reference = store.load(reference_path)
+    except store.BaselineError as exc:
+        _stderr.print(f"[red]erreur d'usage :[/red] {exc}")
+        sys.exit(EXIT_USAGE)
+    return list(evaluate_regressions(compare(reference, captured), thresholds))
+
+
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 @click.version_option(__version__, prog_name="codeatlas")
 def main() -> None:
@@ -116,6 +153,19 @@ def build(
 @click.option("--max-package-cycles", type=int, default=None)
 @click.option("--min-doc-coverage", type=int, default=None)
 @click.option("--max-critical-symbols", type=int, default=None)
+@click.option(
+    "--against-baseline",
+    "against_baseline",
+    is_flag=False,
+    flag_value="__default__",
+    default=None,
+    help="Évalue les règles de régression contre la baseline (FILE optionnel).",
+)
+@click.option("--fail-on-new-cycles", is_flag=True, default=False)
+@click.option("--fail-on-new-violations", is_flag=True, default=False)
+@click.option("--fail-on-new-inferred", is_flag=True, default=False)
+@click.option("--fail-on-removed-public-api", is_flag=True, default=False)
+@click.option("--max-doc-coverage-drop", type=int, default=None)
 @click.option("--json-report", type=click.Path(path_type=Path), default=None)
 def check(
     path: Path,
@@ -123,6 +173,12 @@ def check(
     max_package_cycles: int | None,
     min_doc_coverage: int | None,
     max_critical_symbols: int | None,
+    against_baseline: str | None,
+    fail_on_new_cycles: bool,
+    fail_on_new_violations: bool,
+    fail_on_new_inferred: bool,
+    fail_on_removed_public_api: bool,
+    max_doc_coverage_drop: int | None,
     json_report: Path | None,
 ) -> None:
     """Mode CI : évalue les seuils qualité, exit 3 si au moins un est violé."""
@@ -139,11 +195,26 @@ def check(
         thresholds = replace(thresholds, min_doc_coverage=min_doc_coverage)
     if max_critical_symbols is not None:
         thresholds = replace(thresholds, max_critical_symbols=max_critical_symbols)
+    if fail_on_new_cycles:
+        thresholds = replace(thresholds, fail_on_new_cycles=True)
+    if fail_on_new_violations:
+        thresholds = replace(thresholds, fail_on_new_violations=True)
+    if fail_on_new_inferred:
+        thresholds = replace(thresholds, fail_on_new_inferred=True)
+    if fail_on_removed_public_api:
+        thresholds = replace(thresholds, fail_on_removed_public_api=True)
+    if max_doc_coverage_drop is not None:
+        thresholds = replace(thresholds, max_doc_coverage_drop=max_doc_coverage_drop)
 
     started = time.monotonic()
     try:
         graph = api.analyze(path, config)
         results = api.run_checks(graph, thresholds, config)
+        if against_baseline is not None:
+            regressions = _regression_results(
+                path, graph, config, thresholds, against_baseline
+            )
+            results = [*results, *regressions]  # type: ignore[list-item]
     except api.CodeAtlasError as exc:
         _stderr.print(f"[red]erreur :[/red] {exc}")
         sys.exit(EXIT_FATAL)
@@ -210,6 +281,82 @@ def diagram(
     except api.CodeAtlasError as exc:
         _stderr.print(f"[red]erreur :[/red] {exc}")
         sys.exit(EXIT_FATAL)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(rendered, encoding="utf-8", newline="\n")
+    else:
+        click.echo(rendered, nl=False)
+    sys.exit(EXIT_OK)
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option("--out", type=click.Path(path_type=Path), default=None, help="Destination.")
+@click.option("--archive", default=None, help="Archive aussi vers .codeatlas/history/<LABEL>.json.")
+@click.option("--config", "-c", "config_file", type=click.Path(path_type=Path), default=None)
+def baseline(
+    path: Path, out: Path | None, archive: str | None, config_file: Path | None
+) -> None:
+    """Capture la baseline architecturale du dépôt PATH (feature 002)."""
+    from codeatlas.baseline import store
+
+    config = _load_config_or_exit(path, config_file)
+    try:
+        graph = api.analyze(path, config)
+        captured = api.capture_baseline(graph, config)
+        destination = out if out is not None else store.default_path(path.resolve())
+        store.write(captured, destination)
+        if archive is not None:
+            store.archive(captured, path.resolve(), archive)
+    except store.BaselineError as exc:
+        _stderr.print(f"[red]erreur d'usage :[/red] {exc}")
+        sys.exit(EXIT_USAGE)
+    except api.CodeAtlasError as exc:
+        _stderr.print(f"[red]erreur :[/red] {exc}")
+        sys.exit(EXIT_FATAL)
+    _stderr.print(f"[green]Baseline capturée dans[/green] {destination}")
+    sys.exit(EXIT_OK)
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option("--baseline", "baseline_file", type=click.Path(path_type=Path), default=None)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "markdown", "json"]),
+    default="text",
+)
+@click.option("--out", type=click.Path(path_type=Path), default=None, help="Fichier de sortie.")
+@click.option("--config", "-c", "config_file", type=click.Path(path_type=Path), default=None)
+def diff(
+    path: Path,
+    baseline_file: Path | None,
+    output_format: str,
+    out: Path | None,
+    config_file: Path | None,
+) -> None:
+    """Compare l'état courant à la baseline — toujours informatif (exit 0)."""
+    from codeatlas.baseline import store
+    from codeatlas.baseline.render import render_json, render_markdown, render_text
+
+    config = _load_config_or_exit(path, config_file)
+    reference_path = (
+        baseline_file if baseline_file is not None else store.default_path(path.resolve())
+    )
+    try:
+        reference = store.load(reference_path)
+        graph = api.analyze(path, config)
+        delta = api.diff_baseline(graph, reference, config)
+    except store.BaselineError as exc:
+        _stderr.print(f"[red]erreur d'usage :[/red] {exc}")
+        sys.exit(EXIT_USAGE)
+    except api.CodeAtlasError as exc:
+        _stderr.print(f"[red]erreur :[/red] {exc}")
+        sys.exit(EXIT_FATAL)
+
+    renderers = {"text": render_text, "markdown": render_markdown, "json": render_json}
+    rendered = renderers[output_format](delta)
     if out is not None:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(rendered, encoding="utf-8", newline="\n")

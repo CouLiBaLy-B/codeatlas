@@ -8,6 +8,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover
+    from codeatlas.baseline.capture import Baseline
+    from codeatlas.baseline.compare import ArchDelta
 
 from codeatlas.analyzers.base import AnalyzerOptions, available_analyzers, discover_files
 from codeatlas.config import CheckCfg, Config, load_config
@@ -245,3 +250,21 @@ def run_checks(
     from codeatlas.insights.checks import run_checks as _run
 
     return _run(graph, thresholds, config if config is not None else Config())
+
+
+def capture_baseline(graph: CodeGraph, config: Config | None = None) -> Baseline:
+    """Capture le résumé architectural courant (feature 002)."""
+    from codeatlas.baseline.capture import capture
+
+    return capture(graph, config if config is not None else Config())
+
+
+def diff_baseline(
+    graph: CodeGraph, baseline: Baseline, config: Config | None = None
+) -> ArchDelta:
+    """Compare l'état courant à une baseline → ArchDelta (feature 002)."""
+    from codeatlas.baseline.capture import capture
+    from codeatlas.baseline.compare import compare
+
+    current = capture(graph, config if config is not None else Config())
+    return compare(baseline, current)

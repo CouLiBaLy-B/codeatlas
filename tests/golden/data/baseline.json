@@ -1,0 +1,250 @@
+{
+  "baseline_version": 1,
+  "dead_code": [
+    {
+      "confidence": "medium",
+      "id": "main/shopdemo.legacy.pricing.audit_catalog"
+    },
+    {
+      "confidence": "medium",
+      "id": "main/shopdemo.legacy.pricing.refresh_catalog_price"
+    },
+    {
+      "confidence": "medium",
+      "id": "main/shopdemo.models.order.OrderLine.subtotal"
+    },
+    {
+      "confidence": "medium",
+      "id": "main/shopdemo.models.product.DigitalProduct.price_with_tax"
+    },
+    {
+      "confidence": "high",
+      "id": "main/shopdemo.models.product.Product._rounded"
+    },
+    {
+      "confidence": "high",
+      "id": "main/shopdemo.quality._forgotten_helper"
+    },
+    {
+      "confidence": "medium",
+      "id": "main/shopdemo.quality.forgotten_public_api"
+    }
+  ],
+  "inferred_calls": [
+    {
+      "source": "main/shopdemo.legacy.pricing.refresh_catalog_price",
+      "target": "main/shopdemo.services.catalog.CatalogService.price_of"
+    }
+  ],
+  "ir_version": 1,
+  "layer_violations": [
+    {
+      "source": "shopdemo.storage",
+      "target": "shopdemo.models"
+    }
+  ],
+  "metrics": {
+    "critical_symbols": 1,
+    "doc_coverage": 81,
+    "edges": 49,
+    "files_analyzed": 15,
+    "nodes": 67
+  },
+  "package_cycles": [
+    [
+      "shopdemo.legacy",
+      "shopdemo.services"
+    ]
+  ],
+  "public_api": [
+    {
+      "id": "main/shopdemo.cli.main",
+      "kind": "function",
+      "signature": "(customer: str) -> None"
+    },
+    {
+      "id": "main/shopdemo.legacy.pricing.apply_legacy_discount",
+      "kind": "function",
+      "signature": "(total: float) -> float"
+    },
+    {
+      "id": "main/shopdemo.legacy.pricing.audit_catalog",
+      "kind": "function",
+      "signature": "(service: CatalogService) -> int"
+    },
+    {
+      "id": "main/shopdemo.legacy.pricing.refresh_catalog_price",
+      "kind": "function",
+      "signature": "(service: CatalogService) -> float"
+    },
+    {
+      "id": "main/shopdemo.models.order.Order",
+      "kind": "class",
+      "signature": ""
+    },
+    {
+      "id": "main/shopdemo.models.order.Order.__init__",
+      "kind": "method",
+      "signature": "(customer: str) -> None"
+    },
+    {
+      "id": "main/shopdemo.models.order.Order.add",
+      "kind": "method",
+      "signature": "(product: Product, quantity: int) -> None"
+    },
+    {
+      "id": "main/shopdemo.models.order.Order.total",
+      "kind": "method",
+      "signature": "() -> float"
+    },
+    {
+      "id": "main/shopdemo.models.order.OrderLine",
+      "kind": "class",
+      "signature": ""
+    },
+    {
+      "id": "main/shopdemo.models.order.OrderLine.__init__",
+      "kind": "method",
+      "signature": "(product: Product, quantity: int) -> None"
+    },
+    {
+      "id": "main/shopdemo.models.order.OrderLine.subtotal",
+      "kind": "method",
+      "signature": "() -> float"
+    },
+    {
+      "id": "main/shopdemo.models.product.DigitalProduct",
+      "kind": "class",
+      "signature": ""
+    },
+    {
+      "id": "main/shopdemo.models.product.DigitalProduct.__init__",
+      "kind": "method",
+      "signature": "(name: str, price: float, download_url: str) -> None"
+    },
+    {
+      "id": "main/shopdemo.models.product.DigitalProduct.price_with_tax",
+      "kind": "method",
+      "signature": "(rate: float = 0.055) -> float"
+    },
+    {
+      "id": "main/shopdemo.models.product.Product",
+      "kind": "class",
+      "signature": ""
+    },
+    {
+      "id": "main/shopdemo.models.product.Product.__init__",
+      "kind": "method",
+      "signature": "(name: str, price: float) -> None"
+    },
+    {
+      "id": "main/shopdemo.models.product.Product.price_with_tax",
+      "kind": "method",
+      "signature": "(rate: float = 0.2) -> float"
+    },
+    {
+      "id": "main/shopdemo.models.product._ProductCache.__init__",
+      "kind": "method",
+      "signature": "() -> None"
+    },
+    {
+      "id": "main/shopdemo.quality.forgotten_public_api",
+      "kind": "function",
+      "signature": "() -> None"
+    },
+    {
+      "id": "main/shopdemo.quality.tangled_pricing",
+      "kind": "function",
+      "signature": "(total: float, region: str, vip: bool, coupon: str | None) -> float"
+    },
+    {
+      "id": "main/shopdemo.services.catalog.CatalogService",
+      "kind": "class",
+      "signature": ""
+    },
+    {
+      "id": "main/shopdemo.services.catalog.CatalogService.__init__",
+      "kind": "method",
+      "signature": "(repo: InMemoryRepo) -> None"
+    },
+    {
+      "id": "main/shopdemo.services.catalog.CatalogService.price_of",
+      "kind": "method",
+      "signature": "(name: str) -> float"
+    },
+    {
+      "id": "main/shopdemo.services.catalog.CatalogService.register",
+      "kind": "method",
+      "signature": "(name: str, price: float, digital: bool = False) -> Product"
+    },
+    {
+      "id": "main/shopdemo.services.orders.OrderService",
+      "kind": "class",
+      "signature": ""
+    },
+    {
+      "id": "main/shopdemo.services.orders.OrderService.__init__",
+      "kind": "method",
+      "signature": "() -> None"
+    },
+    {
+      "id": "main/shopdemo.services.orders.OrderService.place",
+      "kind": "method",
+      "signature": "(customer: str, items: dict[str, int]) -> Order"
+    },
+    {
+      "id": "main/shopdemo.services.orders.OrderService.total_after_discount",
+      "kind": "method",
+      "signature": "(order: Order) -> float"
+    },
+    {
+      "id": "main/shopdemo.storage.repo.InMemoryRepo",
+      "kind": "class",
+      "signature": ""
+    },
+    {
+      "id": "main/shopdemo.storage.repo.InMemoryRepo.__init__",
+      "kind": "method",
+      "signature": "() -> None"
+    },
+    {
+      "id": "main/shopdemo.storage.repo.InMemoryRepo.all_names",
+      "kind": "method",
+      "signature": "() -> list[str]"
+    },
+    {
+      "id": "main/shopdemo.storage.repo.InMemoryRepo.find",
+      "kind": "method",
+      "signature": "(name: str) -> Product | None"
+    },
+    {
+      "id": "main/shopdemo.storage.repo.InMemoryRepo.save",
+      "kind": "method",
+      "signature": "(product: Product) -> None"
+    },
+    {
+      "id": "main/shopdemo.webapp.create_product",
+      "kind": "function",
+      "signature": "(name: str, price: float) -> float"
+    },
+    {
+      "id": "main/shopdemo.webapp.list_products",
+      "kind": "function",
+      "signature": "() -> list[str]"
+    }
+  ],
+  "root": "python-demo",
+  "service_deps": [],
+  "skipped": [
+    {
+      "path": "shopdemo/broken/invalid_syntax.py",
+      "reason": "SyntaxError: invalid syntax (ligne 3)"
+    }
+  ],
+  "subprojects": [
+    {
+      "id": "main",
+      "language": "python"
+    }
+  ]
+}

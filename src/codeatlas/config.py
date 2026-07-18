@@ -25,6 +25,7 @@ DEFAULT_EXCLUDES: tuple[str, ...] = (
     "**/build/**",
     "**/target/**",
     "**/.git/**",
+    "**/.codeatlas/**",  # baselines du diff architectural — jamais analysées
     "**/vendor/**",
     "**/.*/**",
     "**/*.min.js",
@@ -74,7 +75,12 @@ class CheckCfg:
     max_package_cycles: int = -1
     min_doc_coverage: int = -1
     max_critical_symbols: int = -1
+    # règles de régression contre la baseline (feature 002) — opt-in
+    fail_on_new_cycles: bool = False
+    fail_on_new_violations: bool = False
     fail_on_new_inferred: bool = False
+    fail_on_removed_public_api: bool = False
+    max_doc_coverage_drop: int = -1  # points de % ; -1 = désactivé
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +166,9 @@ def _validate(config: Config) -> None:
         raise ConfigError("[metrics].doc_coverage_warn : pourcentage attendu (0-100)")
     if config.check.min_doc_coverage != -1 and not 0 <= config.check.min_doc_coverage <= 100:
         raise ConfigError("[check].min_doc_coverage : pourcentage attendu (0-100) ou -1")
+    drop = config.check.max_doc_coverage_drop
+    if drop != -1 and not 0 <= drop <= 100:
+        raise ConfigError("[check].max_doc_coverage_drop : points attendus (0-100) ou -1")
 
 
 def _read_toml(path: Path) -> dict[str, Any]:
