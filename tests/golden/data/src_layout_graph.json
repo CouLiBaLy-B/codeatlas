@@ -1,0 +1,350 @@
+{
+  "edges": [
+    {
+      "certainty": "certain",
+      "file": "src/mypkg/core.py",
+      "kind": "imports",
+      "line": 5,
+      "source": "main/mypkg.core",
+      "target": "main/mypkg.models.order"
+    },
+    {
+      "certainty": "certain",
+      "file": "src/mypkg/core.py",
+      "kind": "imports",
+      "line": 6,
+      "source": "main/mypkg.core",
+      "target": "main/mypkg.models.product"
+    },
+    {
+      "certainty": "certain",
+      "file": "src/mypkg/core.py",
+      "kind": "imports",
+      "line": 7,
+      "source": "main/mypkg.core",
+      "target": "main/mypkg.util"
+    },
+    {
+      "certainty": "certain",
+      "file": "src/mypkg/core.py",
+      "kind": "calls",
+      "line": 19,
+      "source": "main/mypkg.core.discounted_total",
+      "target": "main/mypkg.models.order.Order.total"
+    },
+    {
+      "certainty": "certain",
+      "file": "src/mypkg/core.py",
+      "kind": "calls",
+      "line": 18,
+      "source": "main/mypkg.core.discounted_total",
+      "target": "main/mypkg.util.clamp"
+    },
+    {
+      "certainty": "certain",
+      "file": "src/mypkg/models/order.py",
+      "kind": "imports",
+      "line": 7,
+      "source": "main/mypkg.models.order",
+      "target": "main/mypkg.models.product"
+    },
+    {
+      "certainty": "certain",
+      "file": "src/mypkg/models/order.py",
+      "kind": "associates",
+      "line": 14,
+      "source": "main/mypkg.models.order.Order",
+      "target": "main/mypkg.models.product.Product"
+    },
+    {
+      "certainty": "certain",
+      "file": "src/mypkg/models/product.py",
+      "kind": "imports",
+      "line": 7,
+      "source": "main/mypkg.models.product",
+      "target": "main/mypkg.util"
+    },
+    {
+      "certainty": "certain",
+      "file": "src/mypkg/models/product.py",
+      "kind": "calls",
+      "line": 20,
+      "source": "main/mypkg.models.product.Product.slug",
+      "target": "main/mypkg.util.slugify"
+    }
+  ],
+  "ir_version": 1,
+  "nodes": [
+    {
+      "doc": {
+        "format": "docstring",
+        "raw": "Paquet de démonstration en layout src/ (le package vit sous src/).",
+        "summary": "Paquet de démonstration en layout src/ (le package vit sous src/)."
+      },
+      "file": "src/mypkg/__init__.py",
+      "id": "main/mypkg",
+      "kind": "module",
+      "line": 1,
+      "loc": 1,
+      "modifiers": [
+        "package"
+      ],
+      "name": "mypkg",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "doc": {
+        "format": "docstring",
+        "raw": "Cœur applicatif : orchestre les modèles et les utilitaires (imports internes).",
+        "summary": "Cœur applicatif : orchestre les modèles et les utilitaires (imports internes)."
+      },
+      "file": "src/mypkg/core.py",
+      "id": "main/mypkg.core",
+      "kind": "module",
+      "line": 1,
+      "loc": 19,
+      "name": "core",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "complexity": 1,
+      "doc": {
+        "format": "docstring",
+        "raw": "Construit une commande à partir de couples (nom, prix).",
+        "summary": "Construit une commande à partir de couples (nom, prix)."
+      },
+      "file": "src/mypkg/core.py",
+      "id": "main/mypkg.core.build_order",
+      "kind": "function",
+      "line": 10,
+      "loc": 4,
+      "name": "build_order",
+      "signature": "(names_and_prices: list[tuple[str, float]]) -> Order",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "complexity": 1,
+      "doc": {
+        "format": "docstring",
+        "raw": "Applique une remise bornée entre 0 et 100 % au total d'une commande.",
+        "summary": "Applique une remise bornée entre 0 et 100 % au total d'une commande."
+      },
+      "file": "src/mypkg/core.py",
+      "id": "main/mypkg.core.discounted_total",
+      "kind": "function",
+      "line": 16,
+      "loc": 4,
+      "name": "discounted_total",
+      "signature": "(order: Order, percent: int) -> float",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "doc": {
+        "format": "docstring",
+        "raw": "Modèles de données du paquet de démonstration.",
+        "summary": "Modèles de données du paquet de démonstration."
+      },
+      "file": "src/mypkg/models/__init__.py",
+      "id": "main/mypkg.models",
+      "kind": "module",
+      "line": 1,
+      "loc": 1,
+      "modifiers": [
+        "package"
+      ],
+      "name": "models",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "doc": {
+        "format": "docstring",
+        "raw": "Modèle Commande, dépend de Produit (import interne au package).",
+        "summary": "Modèle Commande, dépend de Produit (import interne au package)."
+      },
+      "file": "src/mypkg/models/order.py",
+      "id": "main/mypkg.models.order",
+      "kind": "module",
+      "line": 1,
+      "loc": 18,
+      "name": "order",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "doc": {
+        "format": "docstring",
+        "raw": "Une commande : une liste de produits.",
+        "summary": "Une commande : une liste de produits."
+      },
+      "file": "src/mypkg/models/order.py",
+      "id": "main/mypkg.models.order.Order",
+      "kind": "class",
+      "line": 11,
+      "loc": 8,
+      "name": "Order",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "file": "src/mypkg/models/order.py",
+      "id": "main/mypkg.models.order.Order.products",
+      "kind": "attribute",
+      "line": 14,
+      "name": "products",
+      "signature": "list[Product]",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "complexity": 1,
+      "doc": {
+        "format": "docstring",
+        "raw": "Somme des prix des produits.",
+        "summary": "Somme des prix des produits."
+      },
+      "file": "src/mypkg/models/order.py",
+      "id": "main/mypkg.models.order.Order.total",
+      "kind": "method",
+      "line": 16,
+      "loc": 3,
+      "name": "total",
+      "signature": "() -> float",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "doc": {
+        "format": "docstring",
+        "raw": "Modèle Produit.",
+        "summary": "Modèle Produit."
+      },
+      "file": "src/mypkg/models/product.py",
+      "id": "main/mypkg.models.product",
+      "kind": "module",
+      "line": 1,
+      "loc": 20,
+      "name": "product",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "doc": {
+        "format": "docstring",
+        "raw": "Un produit du catalogue.",
+        "summary": "Un produit du catalogue."
+      },
+      "file": "src/mypkg/models/product.py",
+      "id": "main/mypkg.models.product.Product",
+      "kind": "class",
+      "line": 11,
+      "loc": 10,
+      "name": "Product",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "file": "src/mypkg/models/product.py",
+      "id": "main/mypkg.models.product.Product.name",
+      "kind": "attribute",
+      "line": 14,
+      "name": "name",
+      "signature": "str",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "file": "src/mypkg/models/product.py",
+      "id": "main/mypkg.models.product.Product.price",
+      "kind": "attribute",
+      "line": 15,
+      "name": "price",
+      "signature": "float",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "complexity": 1,
+      "doc": {
+        "format": "docstring",
+        "raw": "Identifiant lisible dérivé du nom.",
+        "summary": "Identifiant lisible dérivé du nom."
+      },
+      "file": "src/mypkg/models/product.py",
+      "id": "main/mypkg.models.product.Product.slug",
+      "kind": "method",
+      "line": 18,
+      "loc": 3,
+      "modifiers": [
+        "decorator:property",
+        "property"
+      ],
+      "name": "slug",
+      "signature": "() -> str",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "doc": {
+        "format": "docstring",
+        "raw": "Utilitaires de bas niveau, sans dépendance interne.",
+        "summary": "Utilitaires de bas niveau, sans dépendance interne."
+      },
+      "file": "src/mypkg/util.py",
+      "id": "main/mypkg.util",
+      "kind": "module",
+      "line": 1,
+      "loc": 13,
+      "name": "util",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "complexity": 1,
+      "doc": {
+        "format": "docstring",
+        "raw": "Borne une valeur dans l'intervalle [low, high].",
+        "summary": "Borne une valeur dans l'intervalle [low, high]."
+      },
+      "file": "src/mypkg/util.py",
+      "id": "main/mypkg.util.clamp",
+      "kind": "function",
+      "line": 11,
+      "loc": 3,
+      "name": "clamp",
+      "signature": "(value: int, low: int, high: int) -> int",
+      "subproject": "main",
+      "visibility": "public"
+    },
+    {
+      "complexity": 1,
+      "doc": {
+        "format": "docstring",
+        "raw": "Réduit une chaîne à un identifiant simple.",
+        "summary": "Réduit une chaîne à un identifiant simple."
+      },
+      "file": "src/mypkg/util.py",
+      "id": "main/mypkg.util.slugify",
+      "kind": "function",
+      "line": 6,
+      "loc": 3,
+      "name": "slugify",
+      "signature": "(text: str) -> str",
+      "subproject": "main",
+      "visibility": "public"
+    }
+  ],
+  "root": "src-layout-demo",
+  "skipped": [],
+  "subprojects": [
+    {
+      "id": "main",
+      "language": "python",
+      "root": "."
+    }
+  ]
+}

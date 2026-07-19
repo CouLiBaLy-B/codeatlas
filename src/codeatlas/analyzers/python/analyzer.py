@@ -23,6 +23,7 @@ from codeatlas.analyzers.python.calls import (
     resolve_class_name,
 )
 from codeatlas.analyzers.python.complexity import cyclomatic_complexity
+from codeatlas.analyzers.python.import_root import detect_import_roots
 from codeatlas.ir.model import (
     Certainty,
     DocFormat,
@@ -41,9 +42,20 @@ _INTERFACE_BASES = {"Protocol", "ABC", "ABCMeta"}
 _ENUM_BASES = {"Enum", "IntEnum", "StrEnum", "Flag", "IntFlag"}
 
 
-def module_qualname(posix_path: str) -> tuple[str, bool]:
-    """`pkg/mod.py` → (`pkg.mod`, False) ; `pkg/__init__.py` → (`pkg`, True)."""
-    parts = posix_path.removesuffix(".py").split("/")
+def module_qualname(posix_path: str, import_root: str = "") -> tuple[str, bool]:
+    """Nom qualifié importable d'un module, relatif à `import_root` (feature 005).
+
+    `pkg/mod.py` → (`pkg.mod`, False) ; `pkg/__init__.py` → (`pkg`, True).
+    `src/pkg/mod.py` avec import_root `src` → (`pkg.mod`, False) — le préfixe de la
+    racine d'import est retiré pour que le nom corresponde aux instructions `import`.
+    Racine vide → comportement historique (nom = chemin), zéro régression.
+    """
+    relative = posix_path
+    if import_root:
+        prefix = f"{import_root}/"
+        if relative.startswith(prefix):
+            relative = relative[len(prefix) :]
+    parts = relative.removesuffix(".py").split("/")
     if parts[-1] == "__init__":
         return ".".join(parts[:-1]) or parts[0], True
     return ".".join(parts), False
@@ -255,6 +267,10 @@ class PythonAnalyzer:
         fragment = IRFragment()
         modules: list[_ParsedModule] = []
 
+        # Racine d'import par fichier : nomme les modules comme les `import` les
+        # désignent (layout src/, package en sous-répertoire) — feature 005.
+        import_roots = detect_import_roots([source.path for source in files])
+
         # Passe A : parse tolérant.
         for source in files:
             try:
@@ -270,7 +286,7 @@ class PythonAnalyzer:
             except (ValueError, RecursionError) as exc:  # pragma: no cover — rare
                 fragment.skipped.append(SkippedFile(path=source.path, reason=repr(exc)))
                 continue
-            qualname, is_package = module_qualname(source.path)
+            qualname, is_package = module_qualname(source.path, import_roots[source.path])
             modules.append(
                 _ParsedModule(
                     path=source.path,

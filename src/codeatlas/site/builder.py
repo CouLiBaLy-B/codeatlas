@@ -13,6 +13,7 @@ import os
 import shutil
 from pathlib import Path
 
+from codeatlas.analyzers.base import GENERATED_MARKER
 from codeatlas.config import Config
 from codeatlas.insights.patterns import detect_patterns
 from codeatlas.ir.model import CodeGraph, NodeKind
@@ -153,6 +154,10 @@ def build(
     staging.mkdir(parents=True)
 
     try:
+        # Marque la sortie comme générée : l'analyse ignorera ce répertoire s'il est
+        # imbriqué dans un dépôt analysé (feature 005, US3). Contenu statique.
+        _write(staging / GENERATED_MARKER, "généré par CodeAtlas — ne pas analyser\n")
+
         docs = staging / "docs"
         translations = labels(config.project.language)
         extra_pages: list[tuple[str, str]] = []

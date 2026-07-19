@@ -119,24 +119,54 @@ def _is_excluded(posix_path: str, patterns: Iterable[str]) -> bool:
     return False
 
 
+GENERATED_MARKER = ".codeatlas-generated"
+
+
+def _generated_dirs(root: Path) -> set[str]:
+    """Répertoires (POSIX, relatifs à `root`) portant le marqueur de génération.
+
+    Un site produit par CodeAtlas dépose `.codeatlas-generated` à sa racine : ses
+    fichiers (scripts vendorisés, doc rendue) ne doivent jamais être analysés
+    (feature 005, US3) — sinon ils créent de faux modules et sous-projets.
+    """
+    marked: set[str] = set()
+    for marker in root.rglob(GENERATED_MARKER):
+        parent = marker.parent.relative_to(root).as_posix()
+        marked.add("" if parent == "." else parent)
+    return marked
+
+
+def _under_generated(rel_posix: str, generated: set[str]) -> bool:
+    """Le chemin est-il dans (ou sous) un répertoire marqué généré ?"""
+    return any(
+        marked == "" or rel_posix == marked or rel_posix.startswith(f"{marked}/")
+        for marked in generated
+    )
+
+
 def discover_files(
     root: Path,
     excludes: Iterable[str],
     extensions: frozenset[str],
+    include_generated: bool = False,
 ) -> tuple[list[SourceFile], list[SkippedFile]]:
     """Liste triée des fichiers sources d'une racine, exclusions appliquées.
 
     Un fichier illisible (encodage, droits) devient une entrée `skipped` —
-    jamais une exception (constitution IV).
+    jamais une exception (constitution IV). Les répertoires marqués générés sont
+    ignorés sauf `include_generated=True` (réintégration explicite, FR-008).
     """
     sources: list[SourceFile] = []
     skipped: list[SkippedFile] = []
     patterns = list(excludes)
+    generated = set() if include_generated else _generated_dirs(root)
     for path in sorted(root.rglob("*")):
         if not path.is_file() or path.suffix not in extensions:
             continue
         rel = path.relative_to(root).as_posix()
         if _is_excluded(rel, patterns):
+            continue
+        if generated and _under_generated(rel, generated):
             continue
         try:
             text = path.read_text(encoding="utf-8")

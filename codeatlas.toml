@@ -10,8 +10,12 @@ exclude = [
     "tests/**",
     "specs/**",
     "action/**",
-    "src/codeatlas/site/assets/**",   # mermaid vendorisé
+    "src/codeatlas/site/assets/**",   # mermaid/cytoscape vendorisés + JS maison
+    "codeatlas-docs*/**",             # sorties générées (les nouveaux builds portent .codeatlas-generated)
 ]
+
+# Note dogfooding : analyser depuis la racine du dépôt fonctionne (layout src/
+# détecté automatiquement, feature 005) — les modules sont nommés `codeatlas.*`.
 
 [check]
 max_package_cycles = 0
