@@ -12,15 +12,18 @@ Contrat : specs/005-source-root-detection/contracts/source-root.md.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from pathlib import PurePosixPath
 
-_INIT = "__init__.py"
+_INIT = "/__init__.py"
 
 
 def _dirname(posix_path: str) -> str:
-    """Répertoire contenant `posix_path` ; racine du dépôt → chaîne vide."""
-    parent = PurePosixPath(posix_path).parent.as_posix()
-    return "" if parent == "." else parent
+    """Répertoire contenant `posix_path` ; racine du dépôt → chaîne vide.
+
+    Opérations de chaîne pures (pas de PurePosixPath) : appelé dans une boucle de
+    remontée pour chaque fichier, il doit rester bon marché (budget SC-006).
+    """
+    slash = posix_path.rfind("/")
+    return posix_path[:slash] if slash != -1 else ""
 
 
 def detect_import_roots(paths: Sequence[str]) -> dict[str, str]:
@@ -31,7 +34,9 @@ def detect_import_roots(paths: Sequence[str]) -> dict[str, str]:
     Un package déjà à la racine analysée donne une racine vide (comportement historique,
     aucune régression). Pur et déterministe : ne dépend que de l'ensemble des chemins.
     """
-    package_dirs = {_dirname(p) for p in paths if PurePosixPath(p).name == _INIT}
+    package_dirs = {
+        _dirname(p) for p in paths if p == "__init__.py" or p.endswith(_INIT)
+    }
     roots: dict[str, str] = {}
     for path in sorted(paths):
         directory = _dirname(path)
